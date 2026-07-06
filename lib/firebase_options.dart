@@ -1,8 +1,8 @@
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-/// Configurações do Firebase geradas para o projeto spike-dash-8f986.
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -20,30 +20,30 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDx0PLXN8VdxllMAT2Wyh57hBJYnoeth20',
-    appId: '1:927191631737:android:a6943a670ad7d9620c91a8',
-    messagingSenderId: '927191631737',
-    projectId: 'spike-dash-8f986',
-    storageBucket: 'spike-dash-8f986.firebasestorage.app',
+  static final FirebaseOptions android = FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_ANDROID_API_KEY']!,
+    appId: dotenv.env['FIREBASE_ANDROID_APP_ID']!,
+    messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID']!,
+    projectId: dotenv.env['FIREBASE_PROJECT_ID']!,
+    storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET']!,
   );
 
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDx0PLXN8VdxllMAT2Wyh57hBJYnoeth20',
-    appId: '1:927191631737:ios:a6943a670ad7d9620c91a8',
-    messagingSenderId: '927191631737',
-    projectId: 'spike-dash-8f986',
-    storageBucket: 'spike-dash-8f986.firebasestorage.app',
-    iosBundleId: 'com.example.spikeDashApp',
+  static final FirebaseOptions ios = FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_IOS_API_KEY']!,
+    appId: dotenv.env['FIREBASE_IOS_APP_ID']!,
+    messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID']!,
+    projectId: dotenv.env['FIREBASE_PROJECT_ID']!,
+    storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET']!,
+    iosBundleId: dotenv.env['FIREBASE_IOS_BUNDLE_ID']!,
   );
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBTurEwZqTv5_S96LSbfZwoLUQANHGBoQI',
-    appId: '1:927191631737:web:ca1f0f6734f0b90c0c91a8',
-    messagingSenderId: '927191631737',
-    projectId: 'spike-dash-8f986',
-    storageBucket: 'spike-dash-8f986.firebasestorage.app',
-    authDomain: 'spike-dash-8f986.firebaseapp.com',
-    measurementId: 'G-Q31XY2RN9S',
+  static final FirebaseOptions web = FirebaseOptions(
+    apiKey: dotenv.env['FIREBASE_WEB_API_KEY']!,
+    appId: dotenv.env['FIREBASE_WEB_APP_ID']!,
+    messagingSenderId: dotenv.env['FIREBASE_MESSAGING_SENDER_ID']!,
+    projectId: dotenv.env['FIREBASE_PROJECT_ID']!,
+    storageBucket: dotenv.env['FIREBASE_STORAGE_BUCKET']!,
+    authDomain: dotenv.env['FIREBASE_WEB_AUTH_DOMAIN']!,
+    measurementId: dotenv.env['FIREBASE_WEB_MEASUREMENT_ID']!,
   );
 }
