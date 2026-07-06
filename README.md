@@ -68,5 +68,5 @@ spike_dash_app/                    # Aplicação Flutter principal
 ## Integrantes
 
 - Bruno Antonio
-- Wallace
-- Matheus
+- Matheus Santiago
+- Wallace Barreto
