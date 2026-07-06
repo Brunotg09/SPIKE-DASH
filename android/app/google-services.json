@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "927191631737",
+    "project_id": "spike-dash-8f986",
+    "storage_bucket": "spike-dash-8f986.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:927191631737:android:a6943a670ad7d9620c91a8",
+        "android_client_info": {
+          "package_name": "com.example.spike_dash_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDx0PLXN8VdxllMAT2Wyh57hBJYnoeth20"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
