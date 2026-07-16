@@ -12,58 +12,111 @@ Aplicativo Flutter de competição e treino de reflexos com múltiplos modos de 
 - **Stroop Shot** — Pressão cognitiva: decifre enigmas de cores em modo solo ou 1v1
 - **Rankings Globais** — Classificação em tempo real via Cloud Firestore
 - **Perfil do Jogador** — Troféus, vitórias, precisão média e títulos
+- **Sistema de Progressão** — Níveis de ROOKIE a DIVINO com XP e troféus
+- **7 Avatares Desbloqueáveis** — Conquistas e personalização
 
 ## Arquitetura
 
-Estrutura em camadas (Provider/MVVM):
+Service Layer com 4 camadas:
 
 ```
-spike_dash_app/                    # Aplicação Flutter principal
-  ├── android/                       # Configurações Android
-  ├── ios/                           # Configurações iOS
-  ├── web/                           # Configurações Web
-  ├── linux/                         # Configurações Linux
-  ├── macos/                         # Configurações macOS
-  ├── windows/                       # Configurações Windows
-  ├── lib/                           # Código-fonte Dart
-  │   ├── main.dart                  # Ponto de entrada + MultiProvider
-  │   ├── firebase_options.dart      # Credenciais Firebase
-  │   ├── menu.dart                  # Menu principal
-  │   ├── profile.dart               # Perfil do jogador
-  │   ├── rankings.dart              # Rankings globais
-  │   ├── tap_precision.dart         # Mini-jogo: Tap Precision
-  │   ├── reflex_duel.dart           # Mini-jogo: Reflex Duel
-  │   ├── perfect_timing.dart        # Mini-jogo: Perfect Timing Evo
-  │   ├── stroop_shot.dart           # Mini-jogo: Stroop Shot
-  │   ├── config/
-  │   │   └── theme.dart             # Constantes de cores do tema
-  │   ├── models/
-  │   │   ├── usuario.dart           # Modelo do usuário
-  │   │   ├── usuario.g.dart         # Adaptador Hive (build_runner)
-  │   │   └── partida.dart           # Modelo da partida
-  │   ├── providers/
-  │   │   ├── auth_provider.dart     # Autenticação Firebase
-  │   │   ├── usuario_provider.dart  # Dados do jogador
-  │   │   ├── partida_provider.dart  # Histórico de partidas
-  │   │   └── ranking_provider.dart  # Rankings globais
-  │   └── services/
-  │       ├── database_local.dart    # SQLite singleton
-  │       ├── hive_service.dart      # Hive singleton (cache)
-  │       └── firestore_service.dart # Firestore (nuvem)
-  ├── test/                          # Testes
-  ├── pubspec.yaml                   # Dependências Flutter
-  ├── pubspec.lock                   # Lock de dependências
-  ├── analysis_options.yaml          # Configurações de análise
-  └── README.md                      # Readme do projeto Flutter
+lib/
+  ├── main.dart                  # Ponto de entrada + MultiProvider
+  ├── auth_gate.dart             # Controle de autenticação
+  ├── firebase_options.dart      # Credenciais Firebase
+  ├── menu.dart                  # Menu principal
+  ├── profile.dart               # Perfil do jogador
+  ├── rankings.dart              # Rankings globais
+  ├── tap_precision.dart         # Mini-jogo: Tap Precision
+  ├── reflex_duel.dart           # Mini-jogo: Reflex Duel
+  ├── perfect_timing.dart        # Mini-jogo: Perfect Timing Evo
+  ├── stroop_shot.dart           # Mini-jogo: Stroop Shot
+  ├── config/
+  │   └── theme.dart             # Constantes de cores do tema
+  ├── models/
+  │   ├── usuario.dart           # Modelo do usuário
+  │   ├── usuario.g.dart         # Adaptador Hive (build_runner)
+  │   └── partida.dart           # Modelo da partida
+  ├── providers/
+  │   ├── auth_provider.dart     # Autenticação Firebase
+  │   ├── usuario_provider.dart  # Dados do jogador
+  │   ├── partida_provider.dart  # Histórico de partidas
+  │   └── ranking_provider.dart  # Rankings globais
+  └── services/
+      ├── database_local.dart    # SQLite singleton
+      ├── hive_service.dart      # Hive singleton (cache)
+      └── firestore_service.dart # Firestore (nuvem)
+```
+
+## Pré-requisitos
+
+- Flutter SDK `>=3.2.6 <4.0.0`
+- Dart SDK `>=3.2.6 <4.0.0`
+- Conta Firebase configurada
+- Arquivo `.env` com credenciais (ver `.env.example`)
+
+## Instalação
+
+```bash
+# Clone o repositório
+git clone https://github.com/seu-usuario/spike_dash_app.git
+cd spike_dash_app
+
+# Instale dependências
+flutter pub get
+
+# Gere adaptadores Hive (se necessário)
+dart run build_runner build
+
+# Configure o arquivo .env
+cp .env.example .env
+# Edite .env com suas credenciais Firebase
+
+# Execute o app
+flutter run
+```
+
+## Variáveis de Ambiente
+
+O projeto utiliza `flutter_dotenv` para gerenciar credenciais. Crie um arquivo `.env` na raiz;
+```
+
+Consulte `TECHNOLOGIES.md` para lista completa das 18 variáveis.
 
 ## Tecnologias
 
-- **Flutter** — SDK multiplataforma
-- **Firebase Auth** — Autenticação por e-mail
-- **Cloud Firestore** — Banco de dados em nuvem (rankings e partidas)
-- **Hive** — Cache local NoSQL (perfil do jogador)
-- **SQLite** — Banco relacional local (histórico de partidas)
-- **Provider** — Gerenciamento de estado
+| Tecnologia | Versão | Finalidade |
+|------------|--------|------------|
+| Flutter | SDK | Framework multiplataforma |
+| Provider | ^6.1.1 | Gerenciamento de estado |
+| Hive | ^2.2.3 | Cache local NoSQL |
+| SQLite | ^2.3.0 | Banco relacional local |
+| Firebase Core | ^3.12.1 | Inicialização Firebase |
+| Firebase Auth | ^5.5.1 | Autenticação email/senha |
+| Cloud Firestore | ^5.6.5 | Banco de dados nuvem |
+| flutter_dotenv | ^5.2.1 | Variáveis de ambiente |
+| build_runner | ^2.4.7 | Geração de código Hive |
+
+## Estratégia de Cache
+
+```
+Hive (instantâneo) → SQLite (histórico) → Firestore (nuvem)
+```
+
+- **Hive**: Perfil do jogador, configurações
+- **SQLite**: Histórico detalhado de partidas (apenas mobile)
+- **Firestore**: Rankings globais, dados do usuário
+
+## Plataformas
+
+- Android
+- iOS
+- Web
+- Linux
+- macOS
+- Windows
+
+```
 
 ## Integrantes
 
