@@ -93,7 +93,10 @@ class _PerfectTimingScreenState extends State<PerfectTimingScreen> {
   void _salvarPartida() {
     if (_score <= 0 || _saved) return;
     final accuracy = _score > 0 ? (_perfects / _score) * 100 : 0.0;
-    final trofeus = _hits + (_perfects * 3);
+    final multTrofeus = 2.0 + Random().nextDouble() * 1.5;
+    final multXp = 1.0 + Random().nextDouble();
+    final trofeus = ((_hits + (_perfects * 3)) * multTrofeus).toInt();
+    final xp = ((_hits + _perfects) * multXp).toInt();
     final partida = Partida(
       modoJogo: 'perfect_timing',
       pontuacao: trofeus,
@@ -104,8 +107,13 @@ class _PerfectTimingScreenState extends State<PerfectTimingScreen> {
     try {
       context.read<PartidaProvider>().registrarPartida(partida);
       context.read<UsuarioProvider>().adicionarTrofeus(trofeus);
+      context.read<UsuarioProvider>().adicionarXp(xp);
       context.read<UsuarioProvider>().adicionarVitoria();
       context.read<UsuarioProvider>().atualizarPrecisao(accuracy);
+      context.read<UsuarioProvider>().verificarConquistas(
+        comboMaximo: _perfects,
+        precisaoPartida: accuracy,
+      );
       _saved = true;
       debugPrint('[PerfectTiming] Salvo via Provider OK: trofeus=$trofeus');
       return;
@@ -124,10 +132,12 @@ class _PerfectTimingScreenState extends State<PerfectTimingScreen> {
       if (uid == null) return;
 
       final trofeus = _hits + (_perfects * 3);
+      final xp = _hits + _perfects;
       final novosTrofeus = hive.cachedTrofeus + trofeus;
       final novasVitorias = hive.cachedVitorias + 1;
       final accuracy = _score > 0 ? (_perfects / _score) * 100 : 0.0;
       final novaPrecisao = (hive.cachedPrecisaoMedia + accuracy) / 2;
+      final novoXp = hive.cachedXp + xp;
       await hive.salvarCachePerfil(
         uid: uid,
         nickname: hive.cachedNickname ?? 'JOGADOR',
@@ -136,6 +146,10 @@ class _PerfectTimingScreenState extends State<PerfectTimingScreen> {
         trofeus: novosTrofeus,
         vitorias: novasVitorias,
         precisaoMedia: novaPrecisao,
+        xp: novoXp,
+        avatarId: hive.cachedAvatarId,
+        avatarsDesbloqueados: hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: hive.cachedTitulosDesbloqueados,
       );
 
       await firestore.atualizarRanking(Usuario(
@@ -147,6 +161,10 @@ class _PerfectTimingScreenState extends State<PerfectTimingScreen> {
         trofeus: novosTrofeus,
         vitorias: novasVitorias,
         precisaoMedia: novaPrecisao,
+        xp: novoXp,
+        avatarId: hive.cachedAvatarId,
+        avatarsDesbloqueados: hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: hive.cachedTitulosDesbloqueados,
       ));
 
       await firestore.salvarPartida(uid, partida);

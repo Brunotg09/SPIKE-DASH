@@ -41,6 +41,7 @@ class UsuarioProvider extends ChangeNotifier {
         avatarId: _hive.cachedAvatarId,
         avatarsDesbloqueados: _hive.cachedAvatarsDesbloqueados,
         titulosDesbloqueados: _hive.cachedTitulosDesbloqueados,
+        conquistasDesbloqueadas: _hive.cachedConquistasDesbloqueadas,
       );
       notifyListeners();
     }
@@ -68,6 +69,7 @@ class UsuarioProvider extends ChangeNotifier {
         avatarId: _hive.cachedAvatarId,
         avatarsDesbloqueados: _hive.cachedAvatarsDesbloqueados,
         titulosDesbloqueados: _hive.cachedTitulosDesbloqueados,
+        conquistasDesbloqueadas: _hive.cachedConquistasDesbloqueadas,
       );
       notifyListeners();
     }
@@ -95,6 +97,7 @@ class UsuarioProvider extends ChangeNotifier {
       avatarId: _usuario!.avatarId,
       avatarsDesbloqueados: _usuario!.avatarsDesbloqueados,
       titulosDesbloqueados: _usuario!.titulosDesbloqueados,
+      conquistasDesbloqueadas: _usuario!.conquistasDesbloqueadas,
     );
   }
 
@@ -142,14 +145,11 @@ class UsuarioProvider extends ChangeNotifier {
     }
     debugPrint('[UsuarioProvider] adicionarTrofeus: +$quantidade → total=${_usuario!.trofeus + quantidade}');
     _usuario!.trofeus += quantidade;
-    _usuario!.xp += quantidade;
-
-    _recalcularNivel();
 
     notifyListeners();
 
     await _salvarNoHive();
-    debugPrint('[UsuarioProvider] Hive salvo. trofeus=${_usuario!.trofeus}, nivel=${_usuario!.nivel}');
+    debugPrint('[UsuarioProvider] Hive salvo. trofeus=${_usuario!.trofeus}');
 
     try {
       await _firestore.atualizarRanking(_usuario!);
@@ -157,6 +157,54 @@ class UsuarioProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('[UsuarioProvider] ERRO Firestore: $e');
     }
+  }
+
+  /// Adiciona XP ao jogador e sincroniza com Firestore.
+  Future<void> adicionarXp(int quantidade) async {
+    if (_usuario == null) return;
+    debugPrint('[UsuarioProvider] adicionarXp: +$quantidade → total=${_usuario!.xp + quantidade}');
+    _usuario!.xp += quantidade;
+
+    _recalcularNivel();
+
+    notifyListeners();
+
+    await _salvarNoHive();
+
+    try {
+      await _firestore.atualizarRanking(_usuario!);
+    } catch (e) {
+      debugPrint('[UsuarioProvider] ERRO Firestore (xp): $e');
+    }
+  }
+
+  /// Verifica e desbloqueia conquistas após uma partida.
+  Future<List<String>> verificarConquistas({
+    int? comboMaximo,
+    double? precisaoPartida,
+    int? totalPartidas,
+  }) async {
+    if (_usuario == null) return [];
+
+    final novas = _usuario!.verificarConquistas(
+      comboMaximo: comboMaximo,
+      precisaoPartida: precisaoPartida,
+      totalPartidas: totalPartidas,
+    );
+
+    if (novas.isNotEmpty) {
+      debugPrint('[UsuarioProvider] Conquistas desbloqueadas: $novas');
+      notifyListeners();
+      await _salvarNoHive();
+
+      try {
+        await _firestore.salvarUsuario(_usuario!);
+      } catch (e) {
+        debugPrint('[UsuarioProvider] ERRO Firestore (conquistas): $e');
+      }
+    }
+
+    return novas;
   }
 
   /// Incrementa vitórias do jogador e sincroniza.

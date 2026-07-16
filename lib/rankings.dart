@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'config/theme.dart';
 import 'providers/usuario_provider.dart';
 import 'providers/ranking_provider.dart';
+import 'services/firestore_service.dart';
 
 class RankingsScreen extends StatefulWidget {
   const RankingsScreen({super.key});
@@ -22,17 +23,110 @@ class _RankingsScreenState extends State<RankingsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RankingProvider>().iniciarStreamRanking();
+      final provider = context.read<RankingProvider>();
+      provider.iniciarStreamRanking();
+      final usuario = context.read<UsuarioProvider>().usuario;
+      if (usuario != null) {
+        provider.carregarAmigos(usuario.uid);
+      }
     });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh ao voltar para esta tela
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RankingProvider>().refreshStream();
     });
+  }
+
+  void _showAdicionarAmigo() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'ADICIONAR AMIGO',
+          style: TextStyle(
+            color: AppColors.primary,
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Insira o código (UID) do jogador:',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Código do amigo',
+                hintStyle: TextStyle(color: AppColors.textMuted.withOpacity(0.5)),
+                filled: true,
+                fillColor: AppColors.surfaceElevated,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: AppColors.primary),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final codigo = controller.text.trim();
+              if (codigo.isEmpty) return;
+              final usuario = context.read<UsuarioProvider>().usuario;
+              if (usuario == null) return;
+              final firestore = FirestoreService();
+              final success = await firestore.enviarPedidoAmizade(usuario.uid, codigo);
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      success ? 'Amigo adicionado!' : 'Código inválido ou já é amigo',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    backgroundColor: success ? Colors.green : Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                    margin: const EdgeInsets.all(16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                if (success) {
+                  context.read<RankingProvider>().carregarAmigos(usuario.uid);
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('Adicionar', style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -74,7 +168,13 @@ class _RankingsScreenState extends State<RankingsScreen> {
                         letterSpacing: 1.5,
                       ),
                     ),
-                    const SizedBox(width: 70),
+                    if (_activeFilter == 2)
+                      IconButton(
+                        onPressed: _showAdicionarAmigo,
+                        icon: const Icon(Icons.person_add, color: AppColors.primary),
+                      )
+                    else
+                      const SizedBox(width: 70),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -117,9 +217,21 @@ class _RankingsScreenState extends State<RankingsScreen> {
   }
 
   Widget _buildPodio() {
-    return Consumer<RankingProvider>(
-      builder: (context, provider, child) {
-        if (provider.stream == null) {
+    return Consumer2<RankingProvider, UsuarioProvider>(
+      builder: (context, rankingProvider, usuarioProvider, child) {
+        if (rankingProvider.stream == null) {
+          if (_activeFilter == 2 && rankingProvider.uidsAmigos.isEmpty) {
+            return const SizedBox(
+              height: 160,
+              child: Center(
+                child: Text(
+                  'Adicione amigos para ver o ranking!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                ),
+              ),
+            );
+          }
           return const SizedBox(
             height: 160,
             child: Center(
@@ -128,7 +240,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
           );
         }
         return StreamBuilder<QuerySnapshot>(
-          stream: provider.stream,
+          stream: rankingProvider.stream,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const SizedBox(
@@ -140,13 +252,16 @@ class _RankingsScreenState extends State<RankingsScreen> {
             }
 
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-              return const SizedBox(
+              final isEmptyFriends = _activeFilter == 2;
+              return SizedBox(
                 height: 160,
                 child: Center(
                   child: Text(
-                    'Nenhum jogador no ranking ainda.\nJogue para aparecer aqui!',
+                    isEmptyFriends
+                        ? 'Adicione amigos para ver o ranking!'
+                        : 'Nenhum jogador no ranking ainda.\nJogue para aparecer aqui!',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
                   ),
                 ),
               );
@@ -154,12 +269,14 @@ class _RankingsScreenState extends State<RankingsScreen> {
 
             final docs = snapshot.data!.docs;
             if (docs.length < 3) {
-              return const SizedBox(
+              return SizedBox(
                 height: 160,
                 child: Center(
                   child: Text(
-                    'Jogadores insuficientes para pódio.',
-                    style: TextStyle(color: AppColors.textMuted),
+                    _activeFilter == 2
+                        ? 'Adicione mais amigos para o pódio!'
+                        : 'Jogadores insuficientes para pódio.',
+                    style: const TextStyle(color: AppColors.textMuted),
                   ),
                 ),
               );
@@ -208,6 +325,25 @@ class _RankingsScreenState extends State<RankingsScreen> {
     return Consumer2<RankingProvider, UsuarioProvider>(
       builder: (context, rankingProvider, usuarioProvider, child) {
         if (rankingProvider.stream == null) {
+          if (_activeFilter == 2 && rankingProvider.uidsAmigos.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.people_outline,
+                      color: AppColors.textMuted.withOpacity(0.3), size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Nenhum amigo adicionado.\nToque em + para adicionar!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: AppColors.textMuted.withOpacity(0.5),
+                        fontSize: 13),
+                  ),
+                ],
+              ),
+            );
+          }
           return const Center(
             child: CircularProgressIndicator(color: AppColors.primary),
           );
@@ -222,15 +358,19 @@ class _RankingsScreenState extends State<RankingsScreen> {
             }
 
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              final isEmptyFriends = _activeFilter == 2;
               return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.emoji_events_outlined,
-                        color: AppColors.textMuted.withOpacity(0.3), size: 48),
+                    Icon(
+                      isEmptyFriends ? Icons.people_outline : Icons.emoji_events_outlined,
+                      color: AppColors.textMuted.withOpacity(0.3), size: 48),
                     const SizedBox(height: 12),
                     Text(
-                      'Ranking vazio.\nJogue para ser o primeiro!',
+                      isEmptyFriends
+                          ? 'Nenhum amigo encontrado.\nAdicione amigos pelo código!'
+                          : 'Ranking vazio.\nJogue para ser o primeiro!',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           color: AppColors.textMuted.withOpacity(0.5),
@@ -269,8 +409,48 @@ class _RankingsScreenState extends State<RankingsScreen> {
     return Consumer2<RankingProvider, UsuarioProvider>(
       builder: (context, rankingProvider, usuarioProvider, child) {
         final usuario = usuarioProvider.usuario;
+        final stream = rankingProvider.stream;
+
+        if (stream == null) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                  color: AppColors.primary.withOpacity(0.6), width: 1.5),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text('#--',
+                        style: const TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900)),
+                    const SizedBox(width: 12),
+                    Text('${usuario?.nickname ?? 'JOGADOR'} (Tu)',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Text('${usuario?.trofeus ?? 0} troféus',
+                    style: const TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900)),
+              ],
+            ),
+          );
+        }
+
         return StreamBuilder<QuerySnapshot>(
-          stream: rankingProvider.stream,
+          stream: stream,
           builder: (context, snapshot) {
             String myPosition = '#--';
             if (snapshot.hasData && usuario != null) {
@@ -291,8 +471,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
                 color: AppColors.surfaceLight,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                    color: AppColors.primary.withOpacity(0.6),
-                    width: 1.5),
+                    color: AppColors.primary.withOpacity(0.6), width: 1.5),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

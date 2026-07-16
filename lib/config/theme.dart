@@ -69,6 +69,12 @@ class AppTheme {
         surface: AppColors.surface,
         error: AppColors.danger,
       ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
     );
   }
 }

@@ -98,6 +98,12 @@ class HiveService {
     return List<String>.from(list);
   }
 
+  List<String> get cachedConquistasDesbloqueadas {
+    final list = Hive.box(_boxPerfilCache).get('conquistasDesbloqueadas');
+    if (list == null) return [];
+    return List<String>.from(list);
+  }
+
   /// Salva o cache do perfil do usuário logado.
   Future<void> salvarCachePerfil({
     required String uid,
@@ -111,6 +117,7 @@ class HiveService {
     int avatarId = 0,
     List<int>? avatarsDesbloqueados,
     List<String>? titulosDesbloqueados,
+    List<String>? conquistasDesbloqueadas,
   }) async {
     final box = Hive.box(_boxPerfilCache);
     await box.put('uid', uid);
@@ -124,6 +131,7 @@ class HiveService {
     await box.put('avatarId', avatarId);
     await box.put('avatarsDesbloqueados', avatarsDesbloqueados ?? [0]);
     await box.put('titulosDesbloqueados', titulosDesbloqueados ?? ['ROOKIE']);
+    await box.put('conquistasDesbloqueadas', conquistasDesbloqueadas ?? []);
   }
 
   /// Limpa o cache do perfil (logout).

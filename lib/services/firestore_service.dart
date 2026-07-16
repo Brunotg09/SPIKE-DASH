@@ -17,56 +17,102 @@ class FirestoreService {
 
   // ==================== USUARIO ====================
 
-  /// Salva ou atualiza os dados do usuário no Firestore.
+  /// Salva dados do perfil do usuário em 'usuarios/'.
   Future<void> salvarUsuario(Usuario usuario) async {
-    debugPrint('[FirestoreService] salvarUsuario: uid=${usuario.uid}, trofeus=${usuario.trofeus}');
-    await _db.collection('usuarios').doc(usuario.uid).set(usuario.toJson());
+    debugPrint('[FirestoreService] salvarUsuario: uid=${usuario.uid}, nickname=${usuario.nickname}');
+    await _db.collection('usuarios').doc(usuario.uid).set({
+      'uid': usuario.uid,
+      'nickname': usuario.nickname,
+      'email': usuario.email,
+      'xp': usuario.xp,
+      'nivel': usuario.nivel,
+      'nivelNome': usuario.nivelNome,
+      'nivelProgresso': usuario.nivelProgresso,
+      'avatarId': usuario.avatarId,
+      'avatarsDesbloqueados': usuario.avatarsDesbloqueados,
+      'titulo': usuario.titulo,
+      'titulosDesbloqueados': usuario.titulosDesbloqueados,
+      'conquistasDesbloqueadas': usuario.conquistasDesbloqueadas,
+    });
     debugPrint('[FirestoreService] salvarUsuario OK');
   }
 
   /// Busca os dados do usuário pelo UID.
-  /// Lê de 'usuarios/' e cruza com 'rankings/' para pegar troféus atualizados.
+  /// 'usuarios/' = perfil (nickname, email, xp, nivel, avatar)
+  /// 'rankings/' = dados de jogo (trofeus, vitorias, precisão, título)
   Future<Usuario?> buscarUsuario(String uid) async {
     debugPrint('[FirestoreService] buscarUsuario: uid=$uid');
 
-    // Buscar dados base do usuario
     final userDoc = await _db.collection('usuarios').doc(uid).get();
     debugPrint('[FirestoreService] buscarUsuario usuarios exists=${userDoc.exists}');
 
-    // Buscar dados atualizados do ranking
     final rankDoc = await _db.collection('rankings').doc(uid).get();
-    debugPrint('[FirestoreService] buscarUsuario rankings exists=${rankDoc.exists}, data=${rankDoc.data()}');
+    debugPrint('[FirestoreService] buscarUsuario rankings exists=${rankDoc.exists}');
 
-    if (!userDoc.exists || userDoc.data() == null) {
-      // Se nem usuario existe, tenta criar do ranking
-      if (rankDoc.exists && rankDoc.data() != null) {
-        final r = rankDoc.data()!;
-        return Usuario(
-          uid: uid,
-          nickname: r['nickname'] ?? 'JOGADOR',
-          email: '',
-          titulo: r['titulo'] ?? 'ROOKIE',
-          trofeus: r['trofeus'] ?? 0,
-        );
-      }
+    if (!userDoc.exists && !rankDoc.exists) {
       return null;
     }
 
-    // Começa com dados do usuario
-    final usuario = Usuario.fromJson(userDoc.data()!);
+    // Dados do perfil (usuarios/)
+    final nickname = userDoc.exists
+        ? (userDoc.data()!['nickname'] ?? 'JOGADOR')
+        : (rankDoc.exists ? (rankDoc.data()!['nickname'] ?? 'JOGADOR') : 'JOGADOR');
+    final email = userDoc.exists ? (userDoc.data()!['email'] ?? '') : '';
+    final xp = userDoc.exists ? (userDoc.data()!['xp'] ?? 0) : 0;
+    final avatarId = userDoc.exists ? (userDoc.data()!['avatarId'] ?? 0) : 0;
+    final avatarsDesbloqueados = userDoc.exists
+        ? (userDoc.data()!['avatarsDesbloqueados'] as List<dynamic>?)?.map((e) => e as int).toList() ?? [0]
+        : [0];
+    final List<String> conquistasDesbloqueadas = userDoc.exists
+        ? (userDoc.data()!['conquistasDesbloqueadas'] as List<dynamic>?)?.map((e) => e as String).toList() ?? []
+        : [];
 
-    // Se ranking tem dados, usa os troféus do ranking (fonte da verdade)
+    final nivelInfo = Usuario.calcularNivel(xp);
+
+    // Dados de jogo (rankings/)
     if (rankDoc.exists && rankDoc.data() != null) {
       final r = rankDoc.data()!;
-      final rankTrofeus = r['trofeus'] ?? 0;
-      debugPrint('[FirestoreService] buscarUsuario: usuario trofeus=${usuario.trofeus}, ranking trofeus=$rankTrofeus');
-      if (rankTrofeus > usuario.trofeus) {
-        usuario.trofeus = rankTrofeus;
-      }
+      return Usuario(
+        uid: uid,
+        nickname: nickname,
+        email: email,
+        titulo: userDoc.exists ? (userDoc.data()!['titulo'] ?? nivelInfo.nome) : nivelInfo.nome,
+        nivel: nivelInfo.nivel,
+        nivelNome: nivelInfo.nome,
+        nivelProgresso: nivelInfo.progresso,
+        trofeus: r['trofeus'] ?? 0,
+        vitorias: r['vitorias'] ?? 0,
+        precisaoMedia: (r['precisaoMedia'] as num?)?.toDouble() ?? 0.0,
+        xp: xp,
+        avatarId: avatarId,
+        avatarsDesbloqueados: avatarsDesbloqueados,
+        titulosDesbloqueados: userDoc.exists
+            ? (userDoc.data()!['titulosDesbloqueados'] as List<dynamic>?)?.map((e) => e as String).toList() ?? ['ROOKIE']
+            : ['ROOKIE'],
+        conquistasDesbloqueadas: conquistasDesbloqueadas,
+      );
     }
 
-    debugPrint('[FirestoreService] buscarUsuario FINAL: trofeus=${usuario.trofeus}, vitorias=${usuario.vitorias}');
-    return usuario;
+    // Fallback: perfil sem dados de jogo
+    return Usuario(
+      uid: uid,
+      nickname: nickname,
+      email: email,
+      titulo: userDoc.exists ? (userDoc.data()!['titulo'] ?? nivelInfo.nome) : nivelInfo.nome,
+      nivel: nivelInfo.nivel,
+      nivelNome: nivelInfo.nome,
+      nivelProgresso: nivelInfo.progresso,
+      trofeus: 0,
+      vitorias: 0,
+      precisaoMedia: 0.0,
+      xp: xp,
+      avatarId: avatarId,
+      avatarsDesbloqueados: avatarsDesbloqueados,
+      titulosDesbloqueados: userDoc.exists
+          ? (userDoc.data()!['titulosDesbloqueados'] as List<dynamic>?)?.map((e) => e as String).toList() ?? ['ROOKIE']
+          : ['ROOKIE'],
+      conquistasDesbloqueadas: conquistasDesbloqueadas,
+    );
   }
 
   // ==================== RANKINGS ====================
@@ -91,8 +137,9 @@ class FirestoreService {
         .snapshots();
   }
 
-  /// Atualiza o documento de ranking de um jogador.
+  /// Atualiza dados de jogo em 'rankings/' e perfil em 'usuarios/'.
   Future<void> atualizarRanking(Usuario usuario) async {
+    // Dados de jogo → rankings/
     await _db.collection('rankings').doc(usuario.uid).set({
       'uid': usuario.uid,
       'nickname': usuario.nickname,
@@ -103,11 +150,16 @@ class FirestoreService {
       'periodoSemana': _semanaAtual(),
     });
 
-    // Também atualiza os dados do usuário (merge para não sobrescrever)
+    // Perfil (xp, nivel, avatar, titulo) → usuarios/
     await _db.collection('usuarios').doc(usuario.uid).set({
-      'trofeus': usuario.trofeus,
-      'vitorias': usuario.vitorias,
-      'precisaoMedia': usuario.precisaoMedia,
+      'xp': usuario.xp,
+      'nivel': usuario.nivel,
+      'nivelNome': usuario.nivelNome,
+      'nivelProgresso': usuario.nivelProgresso,
+      'avatarId': usuario.avatarId,
+      'avatarsDesbloqueados': usuario.avatarsDesbloqueados,
+      'titulo': usuario.titulo,
+      'titulosDesbloqueados': usuario.titulosDesbloqueados,
     }, SetOptions(merge: true));
   }
 
@@ -159,5 +211,76 @@ class FirestoreService {
     final dayOfYear = now.difference(startOfYear).inDays;
     final weekNumber = (dayOfYear / 7).ceil();
     return '${now.year}-S${weekNumber.toString().padLeft(2, '0')}';
+  }
+
+  // ==================== AMIGOS ====================
+
+  /// Envia pedido de amizade (adiciona UID na lista de amigos de ambos).
+  Future<bool> enviarPedidoAmizade(String meuUid, String codigoAmigo) async {
+    debugPrint('[FirestoreService] enviarPedidoAmizade: $meuUid → $codigoAmigo');
+
+    if (meuUid == codigoAmigo) return false;
+
+    final userDoc = await _db.collection('usuarios').doc(codigoAmigo).get();
+    if (!userDoc.exists) return false;
+
+    final myDoc = await _db.collection('usuarios').doc(meuUid).get();
+    final myFriends = (myDoc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+
+    if (myFriends.contains(codigoAmigo)) return false;
+
+    myFriends.add(codigoAmigo);
+    await _db.collection('usuarios').doc(meuUid).set({
+      'amigos': myFriends,
+    }, SetOptions(merge: true));
+
+    final otherFriends = (userDoc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+    if (!otherFriends.contains(meuUid)) {
+      otherFriends.add(meuUid);
+      await _db.collection('usuarios').doc(codigoAmigo).set({
+        'amigos': otherFriends,
+      }, SetOptions(merge: true));
+    }
+
+    debugPrint('[FirestoreService] enviarPedidoAmizade OK');
+    return true;
+  }
+
+  /// Remove um amigo.
+  Future<void> removerAmigo(String meuUid, String uidAmigo) async {
+    final myDoc = await _db.collection('usuarios').doc(meuUid).get();
+    final myFriends = (myDoc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+
+    myFriends.remove(uidAmigo);
+    await _db.collection('usuarios').doc(meuUid).set({
+      'amigos': myFriends,
+    }, SetOptions(merge: true));
+
+    final otherDoc = await _db.collection('usuarios').doc(uidAmigo).get();
+    final otherFriends = (otherDoc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+
+    otherFriends.remove(meuUid);
+    await _db.collection('usuarios').doc(uidAmigo).set({
+      'amigos': otherFriends,
+    }, SetOptions(merge: true));
+  }
+
+  /// Retorna lista de UIDs de amigos do usuário.
+  Future<List<String>> buscarAmigos(String uid) async {
+    final doc = await _db.collection('usuarios').doc(uid).get();
+    return (doc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+  }
+
+  /// Stream em tempo real do ranking dos amigos.
+  Stream<QuerySnapshot> streamRankingAmigos(List<String> uidsAmigos, {int limit = 100}) {
+    if (uidsAmigos.isEmpty) {
+      return const Stream.empty();
+    }
+    return _db
+        .collection('rankings')
+        .where('uid', whereIn: uidsAmigos)
+        .orderBy('trofeus', descending: true)
+        .limit(limit)
+        .snapshots();
   }
 }

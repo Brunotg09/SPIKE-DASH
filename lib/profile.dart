@@ -15,8 +15,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _selectedAchievement = 0;
-
   static const List<IconData> _avatarIcons = [
     Icons.person,
     Icons.star,
@@ -37,6 +35,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'Coroa',
   ];
 
+  static const Map<int, int> _avatarNivelRequerido = {
+    0: 1,
+    1: 3,
+    2: 5,
+    3: 7,
+    4: 10,
+    5: 13,
+    6: 16,
+  };
+
   static const List<String> _allTitles = [
     'ROOKIE',
     'VETERANO',
@@ -45,6 +53,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     'LENDA',
     'DIVINO',
   ];
+
+  static const Map<String, int> _tituloNivelRequerido = {
+    'ROOKIE': 1,
+    'VETERANO': 4,
+    'EXPERT': 7,
+    'MESTRE': 10,
+    'LENDA': 13,
+    'DIVINO': 16,
+  };
 
   @override
   void initState() {
@@ -166,6 +183,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               letterSpacing: 0.5,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          GestureDetector(
+                            onTap: () {
+                              if (usuario?.uid != null) {
+                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text(
+                                      'Código copiado! Compartilhe com amigos.',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                    backgroundColor: AppColors.primary,
+                                    behavior: SnackBarBehavior.floating,
+                                    margin: const EdgeInsets.all(16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceElevated,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Código: ${usuario?.uid?.substring(0, 8) ?? '----'}...',
+                                    style: TextStyle(
+                                      color: AppColors.textMuted.withOpacity(0.7),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.copy, size: 10, color: AppColors.textMuted.withOpacity(0.7)),
+                                ],
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           GestureDetector(
                             onTap: () => _showTitleSelector(context, provider),
@@ -249,28 +309,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       letterSpacing: 1),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildAchievementCard(
-                        0, 'Fast', Icons.bolt, AppColors.conquistaFast),
-                    _buildAchievementCard(1, 'Combo',
-                        Icons.local_fire_department, AppColors.conquistaCombo),
-                    _buildAchievementCard(2, 'Ritmo', Icons.hourglass_top,
-                        AppColors.conquistaRitmo),
-                    _buildAchievementCard(3, 'Glória', Icons.emoji_events,
-                        AppColors.conquistaGloria),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                const Center(
-                  child: Text(
-                    'Selecione uma conquista para equipar ou ver requisitos.',
-                    style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500),
-                  ),
+                Consumer<UsuarioProvider>(
+                  builder: (context, provider, child) {
+                    final usuario = provider.usuario;
+                    final conquistas = usuario?.conquistasDesbloqueadas ?? [];
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildAchievementCard(
+                          0,
+                          'Fast',
+                          Icons.bolt,
+                          AppColors.conquistaFast,
+                          conquistas.contains('fast'),
+                          'Precisão > 90%',
+                        ),
+                        _buildAchievementCard(
+                          1,
+                          'Combo',
+                          Icons.local_fire_department,
+                          AppColors.conquistaCombo,
+                          conquistas.contains('combo'),
+                          'Combo >= 10',
+                        ),
+                        _buildAchievementCard(
+                          2,
+                          'Ritmo',
+                          Icons.hourglass_top,
+                          AppColors.conquistaRitmo,
+                          conquistas.contains('ritmo'),
+                          '10 partidas',
+                        ),
+                        _buildAchievementCard(
+                          3,
+                          'Glória',
+                          Icons.emoji_events,
+                          AppColors.conquistaGloria,
+                          conquistas.contains('gloria'),
+                          '5 vitórias',
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 20),
 
@@ -363,11 +443,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -381,20 +467,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Avatares são desbloqueados ao subir de nível.',
-              style: TextStyle(
-                color: AppColors.textMuted,
+            Text(
+              'Nível atual: ${usuario.nivel}',
+              style: const TextStyle(
+                color: AppColors.primary,
                 fontSize: 12,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: List.generate(7, (index) {
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              itemCount: 7,
+              itemBuilder: (context, index) {
                 final isUnlocked = usuario.avatarsDesbloqueados.contains(index);
                 final isSelected = usuario.avatarId == index;
+                final nivelRequerido = _avatarNivelRequerido[index] ?? 1;
                 return GestureDetector(
                   onTap: isUnlocked
                       ? () {
@@ -403,8 +497,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         }
                       : null,
                   child: Container(
-                    width: 60,
-                    height: 60,
                     decoration: BoxDecoration(
                       color: isSelected
                           ? AppColors.primary.withOpacity(0.2)
@@ -427,11 +519,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: isUnlocked
                               ? AppColors.primary
                               : AppColors.textMuted.withOpacity(0.3),
-                          size: 24,
+                          size: 22,
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
-                          isUnlocked ? _avatarLabels[index] : '🔒',
+                          isUnlocked
+                              ? _avatarLabels[index]
+                              : 'Nv.$nivelRequerido',
                           style: TextStyle(
                             color: isUnlocked
                                 ? Colors.white
@@ -444,9 +538,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                 );
-              }),
+              },
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -460,11 +554,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -478,11 +578,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Títulos são desbloqueados ao subir de nível.',
-              style: TextStyle(
-                color: AppColors.textMuted,
+            Text(
+              'Nível atual: ${usuario.nivel}',
+              style: const TextStyle(
+                color: AppColors.primary,
                 fontSize: 12,
+                fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 16),
@@ -491,6 +592,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               final isUnlocked =
                   usuario.titulosDesbloqueados.contains(titulo);
               final isSelected = usuario.titulo == titulo;
+              final nivelRequerido = _tituloNivelRequerido[titulo] ?? 1;
               return GestureDetector(
                 onTap: isUnlocked
                     ? () {
@@ -540,8 +642,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const Spacer(),
                       if (!isUnlocked)
-                        const Icon(Icons.lock,
-                            color: AppColors.textMuted, size: 16),
+                        Text(
+                          'Nv.$nivelRequerido',
+                          style: TextStyle(
+                            color: AppColors.textMuted.withOpacity(0.5),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -578,32 +686,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildAchievementCard(
-      int index, String title, IconData icon, Color color) {
-    final isSelected = _selectedAchievement == index;
+    int index,
+    String title,
+    IconData icon,
+    Color color,
+    bool isUnlocked,
+    String requisito,
+  ) {
     return GestureDetector(
-      onTap: () => setState(() => _selectedAchievement = index),
       child: Container(
-        width: 85,
-        height: 75,
+        width: 80,
+        height: 80,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: isUnlocked
+              ? AppColors.surface
+              : AppColors.surface.withOpacity(0.5),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 1.5 : 1.0,
+            color: isUnlocked ? color : AppColors.border,
+            width: isUnlocked ? 1.5 : 1.0,
           ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 6),
+            Icon(
+              icon,
+              color: isUnlocked ? color : AppColors.textMuted.withOpacity(0.3),
+              size: 22,
+            ),
+            const SizedBox(height: 4),
             Text(
               title,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: isUnlocked ? Colors.white : AppColors.textMuted.withOpacity(0.5),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              isUnlocked ? 'Desbloqueado' : requisito,
+              style: TextStyle(
+                color: isUnlocked
+                    ? color
+                    : AppColors.textMuted.withOpacity(0.4),
+                fontSize: 7,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

@@ -48,6 +48,9 @@ class Usuario extends HiveObject {
   @HiveField(13)
   List<String> titulosDesbloqueados;
 
+  @HiveField(14)
+  List<String> conquistasDesbloqueadas;
+
   Usuario({
     required this.uid,
     required this.nickname,
@@ -63,6 +66,7 @@ class Usuario extends HiveObject {
     this.avatarId = 0,
     this.avatarsDesbloqueados = const [0],
     this.titulosDesbloqueados = const ['ROOKIE'],
+    this.conquistasDesbloqueadas = const [],
   });
 
   /// Tabela de níveis: XP necessário para cada nível.
@@ -102,6 +106,57 @@ class Usuario extends HiveObject {
     return 0;
   }
 
+  // ==================== CONQUISTAS ====================
+
+  static const Map<String, String> conquistasNomes = {
+    'fast': 'FAST',
+    'combo': 'COMBO',
+    'ritmo': 'RITMO',
+    'gloria': 'GLORIA',
+  };
+
+  /// Verifica e desbloqueia conquistas baseado nos dados do jogador.
+  /// Retorna lista de conquistas recém-desbloqueadas.
+  List<String> verificarConquistas({
+    int? comboMaximo,
+    double? precisaoPartida,
+    int? totalPartidas,
+  }) {
+    final novas = <String>[];
+
+    // FAST: Precisão média > 90%
+    if (!conquistasDesbloqueadas.contains('fast') &&
+        precisaoMedia > 90) {
+      conquistasDesbloqueadas.add('fast');
+      novas.add('fast');
+    }
+
+    // COMBO: Combo máximo >= 10
+    if (!conquistasDesbloqueadas.contains('combo') &&
+        comboMaximo != null &&
+        comboMaximo >= 10) {
+      conquistasDesbloqueadas.add('combo');
+      novas.add('combo');
+    }
+
+    // RITMO: Total de partidas >= 10
+    if (!conquistasDesbloqueadas.contains('ritmo') &&
+        totalPartidas != null &&
+        totalPartidas >= 10) {
+      conquistasDesbloqueadas.add('ritmo');
+      novas.add('ritmo');
+    }
+
+    // GLORIA: Vitórias >= 5
+    if (!conquistasDesbloqueadas.contains('gloria') &&
+        vitorias >= 5) {
+      conquistasDesbloqueadas.add('gloria');
+      novas.add('gloria');
+    }
+
+    return novas;
+  }
+
   /// Calcula nível e progresso baseado no XP.
   static ({int nivel, String nome, double progresso}) calcularNivel(int xp) {
     int nivel = 1;
@@ -137,6 +192,11 @@ class Usuario extends HiveObject {
               ?.map((e) => e as String)
               .toList() ??
           ['ROOKIE'],
+      conquistasDesbloqueadas:
+          (json['conquistasDesbloqueadas'] as List<dynamic>?)
+                  ?.map((e) => e as String)
+                  .toList() ??
+              [],
     );
   }
 
@@ -157,6 +217,7 @@ class Usuario extends HiveObject {
       'avatarId': avatarId,
       'avatarsDesbloqueados': avatarsDesbloqueados,
       'titulosDesbloqueados': titulosDesbloqueados,
+      'conquistasDesbloqueadas': conquistasDesbloqueadas,
     };
   }
 
@@ -176,6 +237,7 @@ class Usuario extends HiveObject {
     int? avatarId,
     List<int>? avatarsDesbloqueados,
     List<String>? titulosDesbloqueados,
+    List<String>? conquistasDesbloqueadas,
   }) {
     return Usuario(
       uid: uid ?? this.uid,
@@ -193,6 +255,8 @@ class Usuario extends HiveObject {
       avatarsDesbloqueados: avatarsDesbloqueados ?? this.avatarsDesbloqueados,
       titulosDesbloqueados:
           titulosDesbloqueados ?? this.titulosDesbloqueados,
+      conquistasDesbloqueadas:
+          conquistasDesbloqueadas ?? this.conquistasDesbloqueadas,
     );
   }
 }

@@ -146,6 +146,11 @@ class AuthProvider extends ChangeNotifier {
         trofeus: _usuario!.trofeus,
         vitorias: _usuario!.vitorias,
         precisaoMedia: _usuario!.precisaoMedia,
+        xp: _usuario!.xp,
+        avatarId: _usuario!.avatarId,
+        avatarsDesbloqueados: _usuario!.avatarsDesbloqueados,
+        titulosDesbloqueados: _usuario!.titulosDesbloqueados,
+        conquistasDesbloqueadas: _usuario!.conquistasDesbloqueadas,
       );
     } else {
       // Usuário existe no Auth mas não no Firestore — cria localmente
@@ -166,6 +171,11 @@ class AuthProvider extends ChangeNotifier {
       await _hive.salvarCachePerfil(
         uid: _usuario!.uid,
         nickname: _usuario!.nickname,
+        xp: _usuario!.xp,
+        avatarId: _usuario!.avatarId,
+        avatarsDesbloqueados: _usuario!.avatarsDesbloqueados,
+        titulosDesbloqueados: _usuario!.titulosDesbloqueados,
+        conquistasDesbloqueadas: _usuario!.conquistasDesbloqueadas,
       );
     }
 

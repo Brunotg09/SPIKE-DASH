@@ -58,7 +58,10 @@ class _TapPrecisionScreenState extends State<TapPrecisionScreen>
   void _salvarPartida() {
     if (_score <= 0 || _saved) return;
     final accuracy = (_score > 0 ? (_score / (_score + 1)) * 100 : 0.0);
-    final trofeus = _score * 2;
+    final multTrofeus = 1.0 + Random().nextDouble();
+    final multXp = 0.5 + Random().nextDouble() * 0.5;
+    final trofeus = (_score * multTrofeus).toInt();
+    final xp = (_score * multXp).toInt();
     final partida = Partida(
       modoJogo: 'tap_precision',
       pontuacao: trofeus,
@@ -69,8 +72,13 @@ class _TapPrecisionScreenState extends State<TapPrecisionScreen>
     try {
       context.read<PartidaProvider>().registrarPartida(partida);
       context.read<UsuarioProvider>().adicionarTrofeus(trofeus);
+      context.read<UsuarioProvider>().adicionarXp(xp);
       context.read<UsuarioProvider>().adicionarVitoria();
       context.read<UsuarioProvider>().atualizarPrecisao(accuracy);
+      context.read<UsuarioProvider>().verificarConquistas(
+        comboMaximo: _combo,
+        precisaoPartida: accuracy,
+      );
       _saved = true;
       debugPrint('[TapPrecision] Salvo via Provider OK: trofeus=$trofeus');
       return;
@@ -78,10 +86,10 @@ class _TapPrecisionScreenState extends State<TapPrecisionScreen>
       debugPrint('[TapPrecision] Provider falhou ($e), salvando via services...');
     }
 
-    _salvarViaServices(partida, trofeus, accuracy);
+    _salvarViaServices(partida, trofeus, xp, accuracy);
   }
 
-  void _salvarViaServices(Partida partida, int trofeus, double accuracy) async {
+  void _salvarViaServices(Partida partida, int trofeus, int xp, double accuracy) async {
     try {
       final hive = HiveService();
       final firestore = FirestoreService();
@@ -91,6 +99,7 @@ class _TapPrecisionScreenState extends State<TapPrecisionScreen>
       final novosTrofeus = hive.cachedTrofeus + trofeus;
       final novasVitorias = hive.cachedVitorias + 1;
       final novaPrecisao = (hive.cachedPrecisaoMedia + accuracy) / 2;
+      final novoXp = hive.cachedXp + xp;
       await hive.salvarCachePerfil(
         uid: uid,
         nickname: hive.cachedNickname ?? 'JOGADOR',
@@ -99,6 +108,10 @@ class _TapPrecisionScreenState extends State<TapPrecisionScreen>
         trofeus: novosTrofeus,
         vitorias: novasVitorias,
         precisaoMedia: novaPrecisao,
+        xp: novoXp,
+        avatarId: hive.cachedAvatarId,
+        avatarsDesbloqueados: hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: hive.cachedTitulosDesbloqueados,
       );
 
       await firestore.atualizarRanking(Usuario(
@@ -110,6 +123,10 @@ class _TapPrecisionScreenState extends State<TapPrecisionScreen>
         trofeus: novosTrofeus,
         vitorias: novasVitorias,
         precisaoMedia: novaPrecisao,
+        xp: novoXp,
+        avatarId: hive.cachedAvatarId,
+        avatarsDesbloqueados: hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: hive.cachedTitulosDesbloqueados,
       ));
 
       await firestore.salvarPartida(uid, partida);

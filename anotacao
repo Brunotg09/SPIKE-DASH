@@ -1,0 +1,13 @@
+Tem duas formas:
+USB (Recomendado)
+1. Ative Depuração USB nas Opções do Desenvolvedor do celular
+2. Conecte o celular no PC via cabo USB
+3. Rode:
+flutter run
+O Flutter detecta o dispositivo automaticamente.
+Sem Cabo (Wi-Fi)
+1. O celular e o PC precisam estar na mesma rede Wi-Fi
+2. Conecte via USB primeiro e rode:
+flutter run --enable-impeller
+3. Para desconectar o cabo e continuar pelo Wi-Fi, use o IP que aparece no terminal.
+Se flutter run não detectar o celular, rode flutter devices para ver os dispositivos disponíveis.

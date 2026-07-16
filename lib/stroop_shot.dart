@@ -85,7 +85,10 @@ class _StroopShotScreenState extends State<StroopShotScreen>
     if (_score <= 0 || _saved) return;
     final accuracy =
         _totalRounds > 0 ? (_correctAnswers / _totalRounds) * 100 : 0.0;
-    final trofeus = (_correctAnswers * 2) + _maxCombo;
+    final multTrofeus = 1.5 + Random().nextDouble();
+    final multXp = 0.8 + Random().nextDouble() * 0.7;
+    final trofeus = (((_correctAnswers * 2) + _maxCombo) * multTrofeus).toInt();
+    final xp = (((_correctAnswers + (_maxCombo ~/ 2)) * multXp)).toInt();
     final partida = Partida(
       modoJogo: 'stroop_shot',
       pontuacao: trofeus,
@@ -96,8 +99,13 @@ class _StroopShotScreenState extends State<StroopShotScreen>
     try {
       context.read<PartidaProvider>().registrarPartida(partida);
       context.read<UsuarioProvider>().adicionarTrofeus(trofeus);
+      context.read<UsuarioProvider>().adicionarXp(xp);
       context.read<UsuarioProvider>().adicionarVitoria();
       context.read<UsuarioProvider>().atualizarPrecisao(accuracy);
+      context.read<UsuarioProvider>().verificarConquistas(
+        comboMaximo: _maxCombo,
+        precisaoPartida: accuracy,
+      );
       _saved = true;
       debugPrint('[StroopShot] Salvo via Provider OK: trofeus=$trofeus');
       return;
@@ -105,10 +113,10 @@ class _StroopShotScreenState extends State<StroopShotScreen>
       debugPrint('[StroopShot] Provider falhou ($e), salvando via services...');
     }
 
-    _salvarViaServices(partida, trofeus, accuracy);
+    _salvarViaServices(partida, trofeus, xp, accuracy);
   }
 
-  void _salvarViaServices(Partida partida, int trofeus, double accuracy) async {
+  void _salvarViaServices(Partida partida, int trofeus, int xp, double accuracy) async {
     try {
       final hive = HiveService();
       final firestore = FirestoreService();
@@ -118,6 +126,7 @@ class _StroopShotScreenState extends State<StroopShotScreen>
       final novosTrofeus = hive.cachedTrofeus + trofeus;
       final novasVitorias = hive.cachedVitorias + 1;
       final novaPrecisao = (hive.cachedPrecisaoMedia + accuracy) / 2;
+      final novoXp = hive.cachedXp + xp;
       await hive.salvarCachePerfil(
         uid: uid,
         nickname: hive.cachedNickname ?? 'JOGADOR',
@@ -126,6 +135,10 @@ class _StroopShotScreenState extends State<StroopShotScreen>
         trofeus: novosTrofeus,
         vitorias: novasVitorias,
         precisaoMedia: novaPrecisao,
+        xp: novoXp,
+        avatarId: hive.cachedAvatarId,
+        avatarsDesbloqueados: hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: hive.cachedTitulosDesbloqueados,
       );
 
       await firestore.atualizarRanking(Usuario(
@@ -137,6 +150,10 @@ class _StroopShotScreenState extends State<StroopShotScreen>
         trofeus: novosTrofeus,
         vitorias: novasVitorias,
         precisaoMedia: novaPrecisao,
+        xp: novoXp,
+        avatarId: hive.cachedAvatarId,
+        avatarsDesbloqueados: hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: hive.cachedTitulosDesbloqueados,
       ));
 
       await firestore.salvarPartida(uid, partida);

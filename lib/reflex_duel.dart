@@ -57,7 +57,8 @@ class _ReflexDuelScreenState extends State<ReflexDuelScreen> {
 
   void _salvarPartida() {
     if (_matchWinner == 0 || _saved) return;
-    final trofeus = 20;
+    final trofeus = 10 + Random().nextInt(26);
+    final xp = 5 + Random().nextInt(11);
     final partida = Partida(
       modoJogo: 'reflex_duel',
       pontuacao: trofeus,
@@ -68,8 +69,12 @@ class _ReflexDuelScreenState extends State<ReflexDuelScreen> {
     try {
       context.read<PartidaProvider>().registrarPartida(partida);
       context.read<UsuarioProvider>().adicionarTrofeus(trofeus);
+      context.read<UsuarioProvider>().adicionarXp(xp);
       context.read<UsuarioProvider>().adicionarVitoria();
       context.read<UsuarioProvider>().atualizarPrecisao(100.0);
+      context.read<UsuarioProvider>().verificarConquistas(
+        precisaoPartida: 100.0,
+      );
       _saved = true;
       debugPrint('[ReflexDuel] Salvo via Provider OK: trofeus=$trofeus');
       return;
@@ -77,10 +82,10 @@ class _ReflexDuelScreenState extends State<ReflexDuelScreen> {
       debugPrint('[ReflexDuel] Provider falhou ($e), salvando via services...');
     }
 
-    _salvarViaServices(partida, trofeus);
+    _salvarViaServices(partida, trofeus, xp);
   }
 
-  void _salvarViaServices(Partida partida, int trofeus) async {
+  void _salvarViaServices(Partida partida, int trofeus, int xp) async {
     try {
       final hive = HiveService();
       final firestore = FirestoreService();
@@ -90,6 +95,7 @@ class _ReflexDuelScreenState extends State<ReflexDuelScreen> {
       final novosTrofeus = hive.cachedTrofeus + trofeus;
       final novasVitorias = hive.cachedVitorias + 1;
       final novaPrecisao = (hive.cachedPrecisaoMedia + 100.0) / 2;
+      final novoXp = hive.cachedXp + xp;
       await hive.salvarCachePerfil(
         uid: uid,
         nickname: hive.cachedNickname ?? 'JOGADOR',
@@ -98,6 +104,10 @@ class _ReflexDuelScreenState extends State<ReflexDuelScreen> {
         trofeus: novosTrofeus,
         vitorias: novasVitorias,
         precisaoMedia: novaPrecisao,
+        xp: novoXp,
+        avatarId: hive.cachedAvatarId,
+        avatarsDesbloqueados: hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: hive.cachedTitulosDesbloqueados,
       );
 
       await firestore.atualizarRanking(Usuario(
@@ -109,6 +119,10 @@ class _ReflexDuelScreenState extends State<ReflexDuelScreen> {
         trofeus: novosTrofeus,
         vitorias: novasVitorias,
         precisaoMedia: novaPrecisao,
+        xp: novoXp,
+        avatarId: hive.cachedAvatarId,
+        avatarsDesbloqueados: hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: hive.cachedTitulosDesbloqueados,
       ));
 
       await firestore.salvarPartida(uid, partida);

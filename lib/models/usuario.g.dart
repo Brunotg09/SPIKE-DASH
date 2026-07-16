@@ -37,13 +37,17 @@ class UsuarioAdapter extends TypeAdapter<Usuario> {
               ?.map((e) => e as String)
               .toList() ??
           ['ROOKIE'],
+      conquistasDesbloqueadas: (fields[14] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
     );
   }
 
   @override
   void write(BinaryWriter writer, Usuario obj) {
     writer
-      ..writeByte(14)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.uid)
       ..writeByte(1)
@@ -71,7 +75,9 @@ class UsuarioAdapter extends TypeAdapter<Usuario> {
       ..writeByte(12)
       ..write(obj.avatarsDesbloqueados)
       ..writeByte(13)
-      ..write(obj.titulosDesbloqueados);
+      ..write(obj.titulosDesbloqueados)
+      ..writeByte(14)
+      ..write(obj.conquistasDesbloqueadas);
   }
 
   @override

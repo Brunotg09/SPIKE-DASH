@@ -272,49 +272,7 @@ class _AuthScreenState extends State<AuthScreen>
                       },
                     ),
                     const SizedBox(height: 16),
-                    if (_isLogin) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                              child: Divider(
-                                  color: AppColors.borderLight,
-                                  thickness: 1)),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Text(
-                              'OU LOGIN SOCIAL',
-                              style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1),
-                            ),
-                          ),
-                          Expanded(
-                              child: Divider(
-                                  color: AppColors.borderLight,
-                                  thickness: 1)),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                              child: _buildSocialButton(
-                                  label: 'Google',
-                                  icon: Icons.g_mobiledata,
-                                  onPressed: () {})),
-                          const SizedBox(width: 12),
-                          Expanded(
-                              child: _buildSocialButton(
-                                  label: 'Apple',
-                                  icon: Icons.apple,
-                                  onPressed: () {})),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                    ],
+
                     Container(
                       margin: const EdgeInsets.only(top: 16),
                       child: Row(
@@ -559,26 +517,4 @@ class _AuthScreenState extends State<AuthScreen>
     );
   }
 
-  Widget _buildSocialButton(
-      {required String label,
-      required IconData icon,
-      required VoidCallback onPressed}) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon,
-          color: Colors.white, size: label == 'Google' ? 28 : 20),
-      label: Text(label,
-          style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w600)),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        backgroundColor: AppColors.surface,
-        side: const BorderSide(color: AppColors.borderLight),
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
-  }
 }
