@@ -80,6 +80,17 @@ class FirestoreService {
         .snapshots();
   }
 
+  /// Stream em tempo real do ranking semanal.
+  Stream<QuerySnapshot> streamRankingSemanal({int limit = 100}) {
+    final semana = _semanaAtual();
+    return _db
+        .collection('rankings')
+        .where('periodoSemana', isEqualTo: semana)
+        .orderBy('trofeus', descending: true)
+        .limit(limit)
+        .snapshots();
+  }
+
   /// Atualiza o documento de ranking de um jogador.
   Future<void> atualizarRanking(Usuario usuario) async {
     await _db.collection('rankings').doc(usuario.uid).set({

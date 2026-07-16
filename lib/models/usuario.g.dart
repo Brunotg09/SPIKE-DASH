@@ -27,13 +27,23 @@ class UsuarioAdapter extends TypeAdapter<Usuario> {
       trofeus: fields[7] as int,
       vitorias: fields[8] as int,
       precisaoMedia: fields[9] as double,
+      xp: fields[10] as int? ?? 0,
+      avatarId: fields[11] as int? ?? 0,
+      avatarsDesbloqueados: (fields[12] as List<dynamic>?)
+              ?.map((e) => e as int)
+              .toList() ??
+          [0],
+      titulosDesbloqueados: (fields[13] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          ['ROOKIE'],
     );
   }
 
   @override
   void write(BinaryWriter writer, Usuario obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.uid)
       ..writeByte(1)
@@ -53,7 +63,15 @@ class UsuarioAdapter extends TypeAdapter<Usuario> {
       ..writeByte(8)
       ..write(obj.vitorias)
       ..writeByte(9)
-      ..write(obj.precisaoMedia);
+      ..write(obj.precisaoMedia)
+      ..writeByte(10)
+      ..write(obj.xp)
+      ..writeByte(11)
+      ..write(obj.avatarId)
+      ..writeByte(12)
+      ..write(obj.avatarsDesbloqueados)
+      ..writeByte(13)
+      ..write(obj.titulosDesbloqueados);
   }
 
   @override

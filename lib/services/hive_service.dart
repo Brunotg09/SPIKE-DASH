@@ -78,6 +78,26 @@ class HiveService {
     return Hive.box(_boxPerfilCache).get('precisaoMedia', defaultValue: 0.0);
   }
 
+  int get cachedXp {
+    return Hive.box(_boxPerfilCache).get('xp', defaultValue: 0);
+  }
+
+  int get cachedAvatarId {
+    return Hive.box(_boxPerfilCache).get('avatarId', defaultValue: 0);
+  }
+
+  List<int> get cachedAvatarsDesbloqueados {
+    final list = Hive.box(_boxPerfilCache).get('avatarsDesbloqueados');
+    if (list == null) return [0];
+    return List<int>.from(list);
+  }
+
+  List<String> get cachedTitulosDesbloqueados {
+    final list = Hive.box(_boxPerfilCache).get('titulosDesbloqueados');
+    if (list == null) return ['ROOKIE'];
+    return List<String>.from(list);
+  }
+
   /// Salva o cache do perfil do usuário logado.
   Future<void> salvarCachePerfil({
     required String uid,
@@ -87,6 +107,10 @@ class HiveService {
     int trofeus = 0,
     int vitorias = 0,
     double precisaoMedia = 0.0,
+    int xp = 0,
+    int avatarId = 0,
+    List<int>? avatarsDesbloqueados,
+    List<String>? titulosDesbloqueados,
   }) async {
     final box = Hive.box(_boxPerfilCache);
     await box.put('uid', uid);
@@ -96,6 +120,10 @@ class HiveService {
     await box.put('trofeus', trofeus);
     await box.put('vitorias', vitorias);
     await box.put('precisaoMedia', precisaoMedia);
+    await box.put('xp', xp);
+    await box.put('avatarId', avatarId);
+    await box.put('avatarsDesbloqueados', avatarsDesbloqueados ?? [0]);
+    await box.put('titulosDesbloqueados', titulosDesbloqueados ?? ['ROOKIE']);
   }
 
   /// Limpa o cache do perfil (logout).

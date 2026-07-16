@@ -57,27 +57,28 @@ class _TapPrecisionScreenState extends State<TapPrecisionScreen>
 
   void _salvarPartida() {
     if (_score <= 0 || _saved) return;
-    _saved = true;
-    final accuracy = _score > 0 ? (_score / (_score + 1)) * 100 : 0.0;
+    final accuracy = (_score > 0 ? (_score / (_score + 1)) * 100 : 0.0);
+    final trofeus = _score * 2;
     final partida = Partida(
       modoJogo: 'tap_precision',
-      pontuacao: _score,
+      pontuacao: trofeus,
       precisao: accuracy,
       comboMaximo: _combo,
     );
 
     try {
       context.read<PartidaProvider>().registrarPartida(partida);
-      context.read<UsuarioProvider>().adicionarTrofeus(_score);
+      context.read<UsuarioProvider>().adicionarTrofeus(trofeus);
       context.read<UsuarioProvider>().adicionarVitoria();
       context.read<UsuarioProvider>().atualizarPrecisao(accuracy);
-      debugPrint('[TapPrecision] Salvo via Provider OK');
+      _saved = true;
+      debugPrint('[TapPrecision] Salvo via Provider OK: trofeus=$trofeus');
       return;
     } catch (e) {
       debugPrint('[TapPrecision] Provider falhou ($e), salvando via services...');
     }
 
-    _salvarViaServices(partida, _score, accuracy);
+    _salvarViaServices(partida, trofeus, accuracy);
   }
 
   void _salvarViaServices(Partida partida, int trofeus, double accuracy) async {

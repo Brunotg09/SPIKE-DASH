@@ -19,20 +19,28 @@ class UsuarioProvider extends ChangeNotifier {
   /// Carrega dados do cache Hive apenas se _usuario ainda não existe.
   /// Se já existe (logado), NÃO sobrescreve — preserva dados em memória.
   void carregarDoCache() {
-    if (_usuario != null) return; // Já tem dados em memória, não sobrescreve
+    if (_usuario != null) return;
 
     final nickname = _hive.cachedNickname;
     final uid = _hive.cachedUid;
     if (nickname != null && uid != null) {
+      final xp = _hive.cachedXp;
+      final nivelInfo = Usuario.calcularNivel(xp);
       _usuario = Usuario(
         uid: uid,
         nickname: nickname,
         email: '',
-        titulo: _hive.cachedTitulo ?? 'ROOKIE',
-        nivel: _hive.cachedNivel ?? 1,
+        titulo: _hive.cachedTitulo ?? nivelInfo.nome,
+        nivel: nivelInfo.nivel,
+        nivelNome: nivelInfo.nome,
+        nivelProgresso: nivelInfo.progresso,
         trofeus: _hive.cachedTrofeus,
         vitorias: _hive.cachedVitorias,
         precisaoMedia: _hive.cachedPrecisaoMedia,
+        xp: xp,
+        avatarId: _hive.cachedAvatarId,
+        avatarsDesbloqueados: _hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: _hive.cachedTitulosDesbloqueados,
       );
       notifyListeners();
     }
@@ -43,15 +51,23 @@ class UsuarioProvider extends ChangeNotifier {
     final nickname = _hive.cachedNickname;
     final uid = _hive.cachedUid;
     if (nickname != null && uid != null) {
+      final xp = _hive.cachedXp;
+      final nivelInfo = Usuario.calcularNivel(xp);
       _usuario = Usuario(
         uid: uid,
         nickname: nickname,
         email: '',
-        titulo: _hive.cachedTitulo ?? 'ROOKIE',
-        nivel: _hive.cachedNivel ?? 1,
+        titulo: _hive.cachedTitulo ?? nivelInfo.nome,
+        nivel: nivelInfo.nivel,
+        nivelNome: nivelInfo.nome,
+        nivelProgresso: nivelInfo.progresso,
         trofeus: _hive.cachedTrofeus,
         vitorias: _hive.cachedVitorias,
         precisaoMedia: _hive.cachedPrecisaoMedia,
+        xp: xp,
+        avatarId: _hive.cachedAvatarId,
+        avatarsDesbloqueados: _hive.cachedAvatarsDesbloqueados,
+        titulosDesbloqueados: _hive.cachedTitulosDesbloqueados,
       );
       notifyListeners();
     }
@@ -75,7 +91,47 @@ class UsuarioProvider extends ChangeNotifier {
       trofeus: _usuario!.trofeus,
       vitorias: _usuario!.vitorias,
       precisaoMedia: _usuario!.precisaoMedia,
+      xp: _usuario!.xp,
+      avatarId: _usuario!.avatarId,
+      avatarsDesbloqueados: _usuario!.avatarsDesbloqueados,
+      titulosDesbloqueados: _usuario!.titulosDesbloqueados,
     );
+  }
+
+  /// Recalcula nível, título e avatar baseado no XP.
+  void _recalcularNivel() {
+    if (_usuario == null) return;
+
+    final nivelInfo = Usuario.calcularNivel(_usuario!.xp);
+    final nivelAnterior = _usuario!.nivel;
+
+    _usuario!.nivel = nivelInfo.nivel;
+    _usuario!.nivelNome = nivelInfo.nome;
+    _usuario!.nivelProgresso = nivelInfo.progresso;
+
+    // Desbloquear título do novo nível
+    final tituloNovo = Usuario.tituloDoNivel(nivelInfo.nivel);
+    if (!_usuario!.titulosDesbloqueados.contains(tituloNovo)) {
+      _usuario!.titulosDesbloqueados = [
+        ..._usuario!.titulosDesbloqueados,
+        tituloNovo,
+      ];
+    }
+    _usuario!.titulo = tituloNovo;
+
+    // Desbloquear avatar do novo nível
+    final avatarNovo = Usuario.avatarDesbloqueado(nivelInfo.nivel);
+    if (!_usuario!.avatarsDesbloqueados.contains(avatarNovo)) {
+      _usuario!.avatarsDesbloqueados = [
+        ..._usuario!.avatarsDesbloqueados,
+        avatarNovo,
+      ];
+      _usuario!.avatarId = avatarNovo;
+    }
+
+    if (nivelInfo.nivel != nivelAnterior) {
+      debugPrint('[UsuarioProvider] Nível-up! $nivelAnterior → ${nivelInfo.nivel} (${nivelInfo.nome})');
+    }
   }
 
   /// Adiciona troféus ao jogador e sincroniza com Firestore.
@@ -86,15 +142,15 @@ class UsuarioProvider extends ChangeNotifier {
     }
     debugPrint('[UsuarioProvider] adicionarTrofeus: +$quantidade → total=${_usuario!.trofeus + quantidade}');
     _usuario!.trofeus += quantidade;
+    _usuario!.xp += quantidade;
 
-    // Notifica UI IMEDIATAMENTE (antes de qualquer await)
+    _recalcularNivel();
+
     notifyListeners();
 
-    // Salva no Hive (rápido, local)
     await _salvarNoHive();
-    debugPrint('[UsuarioProvider] Hive salvo. trofeus=${_usuario!.trofeus}');
+    debugPrint('[UsuarioProvider] Hive salvo. trofeus=${_usuario!.trofeus}, nivel=${_usuario!.nivel}');
 
-    // Firestore em background (pode falhar)
     try {
       await _firestore.atualizarRanking(_usuario!);
       debugPrint('[UsuarioProvider] Firestore atualizado com sucesso.');
@@ -131,6 +187,34 @@ class UsuarioProvider extends ChangeNotifier {
       await _firestore.atualizarRanking(_usuario!);
     } catch (e) {
       debugPrint('[UsuarioProvider] ERRO Firestore (precisao): $e');
+    }
+  }
+
+  /// Atualiza avatar do jogador.
+  Future<void> setAvatar(int avatarId) async {
+    if (_usuario == null) return;
+    if (!_usuario!.avatarsDesbloqueados.contains(avatarId)) return;
+    _usuario!.avatarId = avatarId;
+    notifyListeners();
+    await _salvarNoHive();
+    try {
+      await _firestore.atualizarRanking(_usuario!);
+    } catch (e) {
+      debugPrint('[UsuarioProvider] ERRO Firestore (avatar): $e');
+    }
+  }
+
+  /// Atualiza título do jogador.
+  Future<void> setTitulo(String titulo) async {
+    if (_usuario == null) return;
+    if (!_usuario!.titulosDesbloqueados.contains(titulo)) return;
+    _usuario!.titulo = titulo;
+    notifyListeners();
+    await _salvarNoHive();
+    try {
+      await _firestore.atualizarRanking(_usuario!);
+    } catch (e) {
+      debugPrint('[UsuarioProvider] ERRO Firestore (titulo): $e');
     }
   }
 }

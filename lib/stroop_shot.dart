@@ -31,10 +31,24 @@ class _StroopShotScreenState extends State<StroopShotScreen>
     {'name': 'VERMELHO', 'color': const Color(0xFFFF0055)},
     {'name': 'AMARELO', 'color': const Color(0xFFFFE600)},
     {'name': 'ROXO', 'color': const Color(0xFFBB66FF)},
+    {'name': 'LARANJA', 'color': const Color(0xFFFF8C00)},
+    {'name': 'ROSA', 'color': const Color(0xFFFF69B4)},
+    {'name': 'CINZA', 'color': const Color(0xFFB0B0B0)},
+    {'name': 'MARROM', 'color': const Color(0xFFCD853F)},
+    {'name': 'CYAN', 'color': const Color(0xFF00FFFF)},
+    {'name': 'MAGENTA', 'color': const Color(0xFFFF00FF)},
+    {'name': 'LIMA', 'color': const Color(0xFF32CD32)},
+    {'name': 'CORAL', 'color': const Color(0xFFFF7F50)},
+    {'name': 'TURQUESA', 'color': const Color(0xFF40E0D0)},
+    {'name': 'VIOLETA', 'color': const Color(0xFF9400D3)},
   ];
+
+  List<Map<String, dynamic>> _roundButtons = [];
 
   int _textIndex = 0;
   int _colorIndex = 0;
+  int _roundButtonCount = 5;
+  int _currentWordDurationMs = 1200;
 
   int _score = 0;
   int _combo = 0;
@@ -69,28 +83,29 @@ class _StroopShotScreenState extends State<StroopShotScreen>
 
   void _salvarPartida() {
     if (_score <= 0 || _saved) return;
-    _saved = true;
     final accuracy =
         _totalRounds > 0 ? (_correctAnswers / _totalRounds) * 100 : 0.0;
+    final trofeus = (_correctAnswers * 2) + _maxCombo;
     final partida = Partida(
       modoJogo: 'stroop_shot',
-      pontuacao: _score,
+      pontuacao: trofeus,
       precisao: accuracy,
       comboMaximo: _maxCombo,
     );
 
     try {
       context.read<PartidaProvider>().registrarPartida(partida);
-      context.read<UsuarioProvider>().adicionarTrofeus(_score);
+      context.read<UsuarioProvider>().adicionarTrofeus(trofeus);
       context.read<UsuarioProvider>().adicionarVitoria();
       context.read<UsuarioProvider>().atualizarPrecisao(accuracy);
-      debugPrint('[StroopShot] Salvo via Provider OK');
+      _saved = true;
+      debugPrint('[StroopShot] Salvo via Provider OK: trofeus=$trofeus');
       return;
     } catch (e) {
       debugPrint('[StroopShot] Provider falhou ($e), salvando via services...');
     }
 
-    _salvarViaServices(partida, _score, accuracy);
+    _salvarViaServices(partida, trofeus, accuracy);
   }
 
   void _salvarViaServices(Partida partida, int trofeus, double accuracy) async {
@@ -173,15 +188,32 @@ class _StroopShotScreenState extends State<StroopShotScreen>
       _colorIndex = _rng.nextInt(_colors.length);
     } while (_colorIndex == _textIndex && _rng.nextDouble() > 0.3);
 
-    // Fase 1: Mostrar a palavra por 1.2s
+    _roundButtonCount = 4 + _rng.nextInt(5);
+
+    final List<int> availableIndices = List.generate(_colors.length, (i) => i);
+    availableIndices.remove(_colorIndex);
+    availableIndices.shuffle(_rng);
+
+    final List<int> selectedIndices = [_colorIndex];
+    for (int i = 0; i < _roundButtonCount - 1 && i < availableIndices.length; i++) {
+      selectedIndices.add(availableIndices[i]);
+    }
+    selectedIndices.shuffle(_rng);
+
+    _roundButtons = selectedIndices.map((i) => _colors[i]).toList();
+
+    _colorIndex = selectedIndices.indexOf(_colorIndex);
+
+    final wordDuration = 500 + _rng.nextInt(1001);
+    _currentWordDurationMs = wordDuration;
+
     setState(() {
       _gameState = GameState.showingWord;
     });
 
-    _wordTimer = Timer(const Duration(milliseconds: 1200), () {
+    _wordTimer = Timer(Duration(milliseconds: wordDuration), () {
       if (_gameState != GameState.showingWord) return;
 
-      // Fase 2: Esconder palavra, mostrar botões com timer
       setState(() {
         _gameState = GameState.pickingColor;
         _pickTimeLeft = _pickTimeMax;
@@ -242,7 +274,7 @@ class _StroopShotScreenState extends State<StroopShotScreen>
 
     setState(() {
       _gameState = GameState.feedback;
-      _feedbackText = 'ERRADO! Era ${_colors[_colorIndex]['name']}';
+      _feedbackText = 'ERRADO! Era ${_roundButtons[_colorIndex]['name']}';
       _feedbackColor = const Color(0xFFFF0055);
     });
 
@@ -340,8 +372,9 @@ class _StroopShotScreenState extends State<StroopShotScreen>
               color: Colors.white.withOpacity(0.5), fontSize: 13, height: 1.5),
         ),
         const SizedBox(height: 32),
-        _infoTile('FASE 1', 'A palavra aparece por 1.2s', const Color(0xFF00FFFF)),
+        _infoTile('FASE 1', 'A palavra aparece por 0.5s ~ 1.5s', const Color(0xFF00FFFF)),
         _infoTile('FASE 2', 'Escolha a cor VISUAL em até ${_pickTimeMax}s', const Color(0xFFFFE600)),
+        _infoTile('BOTÕES', '4 a 8 botões aleatórios por rodada', const Color(0xFFBB66FF)),
         _infoTile('DIFICULDADE', 'Tempo de escolha diminui', const Color(0xFFFF0055)),
         const SizedBox(height: 40),
         ElevatedButton(
@@ -533,7 +566,7 @@ class _StroopShotScreenState extends State<StroopShotScreen>
           ),
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 1.0, end: 0.0),
-            duration: const Duration(milliseconds: 1200),
+            duration: Duration(milliseconds: _currentWordDurationMs),
             builder: (context, value, _) {
               return FractionallySizedBox(
                 alignment: Alignment.centerLeft,
@@ -552,13 +585,13 @@ class _StroopShotScreenState extends State<StroopShotScreen>
         Text(
           _colors[_textIndex]['name'],
           style: TextStyle(
-            color: _colors[_colorIndex]['color'],
+            color: _roundButtons[_colorIndex]['color'],
             fontSize: 52,
             fontWeight: FontWeight.w900,
             letterSpacing: 3,
             shadows: [
               Shadow(
-                color: _colors[_colorIndex]['color'].withOpacity(0.6),
+                color: _roundButtons[_colorIndex]['color'].withOpacity(0.6),
                 blurRadius: 30,
               ),
             ],
@@ -568,7 +601,7 @@ class _StroopShotScreenState extends State<StroopShotScreen>
         Text(
           '← esta é a cor que você vê',
           style: TextStyle(
-              color: _colors[_colorIndex]['color'].withOpacity(0.5),
+              color: _roundButtons[_colorIndex]['color'].withOpacity(0.5),
               fontSize: 11),
         ),
       ],
@@ -614,19 +647,18 @@ class _StroopShotScreenState extends State<StroopShotScreen>
           ),
         ),
         const SizedBox(height: 24),
-        // Botões de cor
         Expanded(
           child: GridView.builder(
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _roundButtonCount <= 4 ? 2 : (_roundButtonCount <= 6 ? 2 : 3),
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
-              childAspectRatio: 2.2,
+              childAspectRatio: _roundButtonCount <= 4 ? 2.5 : (_roundButtonCount <= 6 ? 2.2 : 1.8),
             ),
-            itemCount: _colors.length,
+            itemCount: _roundButtons.length,
             itemBuilder: (context, index) {
-              final item = _colors[index];
+              final item = _roundButtons[index];
               return GestureDetector(
                 onTap: () => _verifyAnswer(index),
                 child: Container(
@@ -692,9 +724,9 @@ class _StroopShotScreenState extends State<StroopShotScreen>
           ),
           const SizedBox(height: 4),
           Text(
-            _colors[_colorIndex]['name'],
+            _roundButtons[_colorIndex]['name'],
             style: TextStyle(
-              color: _colors[_colorIndex]['color'],
+              color: _roundButtons[_colorIndex]['color'],
               fontSize: 24,
               fontWeight: FontWeight.w900,
             ),

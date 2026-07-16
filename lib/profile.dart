@@ -15,8 +15,36 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _currentTab = 2;
   int _selectedAchievement = 0;
+
+  static const List<IconData> _avatarIcons = [
+    Icons.person,
+    Icons.star,
+    Icons.local_fire_department,
+    Icons.emoji_events,
+    Icons.military_tech,
+    Icons.workspace_premium,
+    Icons.diamond,
+  ];
+
+  static const List<String> _avatarLabels = [
+    'Padrão',
+    'Estrela',
+    'Fogo',
+    'Troféu',
+    ' militar',
+    'Premium',
+    'Coroa',
+  ];
+
+  static const List<String> _allTitles = [
+    'ROOKIE',
+    'VETERANO',
+    'EXPERT',
+    'MESTRE',
+    'LENDA',
+    'DIVINO',
+  ];
 
   @override
   void initState() {
@@ -97,18 +125,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Stack(
                             alignment: Alignment.bottomRight,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: AppColors.secondary, width: 2),
-                                ),
-                                child: const CircleAvatar(
-                                  radius: 32,
-                                  backgroundColor: AppColors.surface,
-                                  child: Icon(Icons.person,
-                                      color: AppColors.secondary, size: 36),
+                              GestureDetector(
+                                onTap: () => _showAvatarSelector(context, provider),
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: AppColors.secondary, width: 2),
+                                  ),
+                                  child: CircleAvatar(
+                                    radius: 32,
+                                    backgroundColor: AppColors.surface,
+                                    child: Icon(
+                                      _avatarIcons[usuario?.avatarId ?? 0],
+                                      color: AppColors.secondary,
+                                      size: 36,
+                                    ),
+                                  ),
                                 ),
                               ),
                               Container(
@@ -117,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   color: AppColors.secondary,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.refresh,
+                                child: const Icon(Icons.edit,
                                     color: Colors.black, size: 14),
                               ),
                             ],
@@ -133,27 +167,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.accent,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'TITULO: ${usuario?.titulo ?? 'ROOKIE'}',
-                                  style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w900),
-                                ),
-                                const SizedBox(width: 4),
-                                const Icon(Icons.bolt,
-                                    color: Colors.black, size: 12),
-                              ],
+                          GestureDetector(
+                            onTap: () => _showTitleSelector(context, provider),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.accent,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'TITULO: ${usuario?.titulo ?? 'ROOKIE'}',
+                                    style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w900),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.edit,
+                                      color: Colors.black, size: 12),
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -168,7 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     fontWeight: FontWeight.bold),
                               ),
                               Text(
-                                '${((usuario?.nivelProgresso ?? 0) * 100).toInt()}% PARA LVL ${(usuario?.nivel ?? 1) + 1}',
+                                '${usuario?.xp ?? 0} XP',
                                 style: const TextStyle(
                                     color: AppColors.textMuted,
                                     fontSize: 11,
@@ -186,6 +223,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               valueColor: const AlwaysStoppedAnimation<Color>(
                                   AppColors.secondary),
                             ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${((usuario?.nivelProgresso ?? 0) * 100).toInt()}% PARA LVL ${(usuario?.nivel ?? 1) + 1}',
+                            style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -277,7 +322,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: TextButton(
                     onPressed: () {
                       context.read<AuthProvider>().logout();
-                      Navigator.of(context).popUntil((route) => route.isFirst);
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: AppColors.surfaceElevated,
@@ -307,6 +351,204 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showAvatarSelector(BuildContext context, UsuarioProvider provider) {
+    final usuario = provider.usuario;
+    if (usuario == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'SELECIONAR AVATAR',
+              style: TextStyle(
+                color: AppColors.secondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Avatares são desbloqueados ao subir de nível.',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: List.generate(7, (index) {
+                final isUnlocked = usuario.avatarsDesbloqueados.contains(index);
+                final isSelected = usuario.avatarId == index;
+                return GestureDetector(
+                  onTap: isUnlocked
+                      ? () {
+                          provider.setAvatar(index);
+                          Navigator.pop(context);
+                        }
+                      : null,
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary.withOpacity(0.2)
+                          : AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.primary
+                            : isUnlocked
+                                ? AppColors.borderLight
+                                : AppColors.border,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _avatarIcons[index],
+                          color: isUnlocked
+                              ? AppColors.primary
+                              : AppColors.textMuted.withOpacity(0.3),
+                          size: 24,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isUnlocked ? _avatarLabels[index] : '🔒',
+                          style: TextStyle(
+                            color: isUnlocked
+                                ? Colors.white
+                                : AppColors.textMuted.withOpacity(0.5),
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTitleSelector(BuildContext context, UsuarioProvider provider) {
+    final usuario = provider.usuario;
+    if (usuario == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'SELECIONAR TÍTULO',
+              style: TextStyle(
+                color: AppColors.secondary,
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Títulos são desbloqueados ao subir de nível.',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...List.generate(_allTitles.length, (index) {
+              final titulo = _allTitles[index];
+              final isUnlocked =
+                  usuario.titulosDesbloqueados.contains(titulo);
+              final isSelected = usuario.titulo == titulo;
+              return GestureDetector(
+                onTap: isUnlocked
+                    ? () {
+                        provider.setTitulo(titulo);
+                        Navigator.pop(context);
+                      }
+                    : null,
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? AppColors.primary.withOpacity(0.2)
+                        : AppColors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.primary
+                          : isUnlocked
+                              ? AppColors.borderLight
+                              : AppColors.border,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSelected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: isUnlocked
+                            ? AppColors.primary
+                            : AppColors.textMuted.withOpacity(0.3),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        titulo,
+                        style: TextStyle(
+                          color: isUnlocked
+                              ? Colors.white
+                              : AppColors.textMuted.withOpacity(0.5),
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (!isUnlocked)
+                        const Icon(Icons.lock,
+                            color: AppColors.textMuted, size: 16),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 10),
+          ],
         ),
       ),
     );

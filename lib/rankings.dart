@@ -345,7 +345,10 @@ class _RankingsScreenState extends State<RankingsScreen> {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
-          onTap: () => setState(() => _activeFilter = index),
+          onTap: () {
+            setState(() => _activeFilter = index);
+            context.read<RankingProvider>().setFilter(index);
+          },
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(

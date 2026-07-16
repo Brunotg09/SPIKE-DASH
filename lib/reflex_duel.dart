@@ -57,27 +57,27 @@ class _ReflexDuelScreenState extends State<ReflexDuelScreen> {
 
   void _salvarPartida() {
     if (_matchWinner == 0 || _saved) return;
-    _saved = true;
-    final pontuacao = _matchWinner == 1 ? _p1Score * 50 : _p2Score * 50;
+    final trofeus = 20;
     final partida = Partida(
       modoJogo: 'reflex_duel',
-      pontuacao: _matchWinner == 1 ? _p1Score : _p2Score,
+      pontuacao: trofeus,
       precisao: 100.0,
       comboMaximo: 0,
     );
 
     try {
       context.read<PartidaProvider>().registrarPartida(partida);
-      context.read<UsuarioProvider>().adicionarTrofeus(pontuacao);
+      context.read<UsuarioProvider>().adicionarTrofeus(trofeus);
       context.read<UsuarioProvider>().adicionarVitoria();
       context.read<UsuarioProvider>().atualizarPrecisao(100.0);
-      debugPrint('[ReflexDuel] Salvo via Provider OK');
+      _saved = true;
+      debugPrint('[ReflexDuel] Salvo via Provider OK: trofeus=$trofeus');
       return;
     } catch (e) {
       debugPrint('[ReflexDuel] Provider falhou ($e), salvando via services...');
     }
 
-    _salvarViaServices(partida, pontuacao);
+    _salvarViaServices(partida, trofeus);
   }
 
   void _salvarViaServices(Partida partida, int trofeus) async {

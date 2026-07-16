@@ -14,13 +14,35 @@ class AuthProvider extends ChangeNotifier {
   fb.User? _user;
   Usuario? _usuario;
   bool _carregando = false;
+  bool _inicializado = false;
   String? _erro;
 
   fb.User? get user => _user;
   Usuario? get usuario => _usuario;
   bool get carregando => _carregando;
+  bool get inicializado => _inicializado;
   bool get isLoggedIn => _user != null;
   String? get erro => _erro;
+
+  /// Verifica se há sessão persistida no Firebase Auth.
+  /// Firebase Auth mantém a sessão automaticamente (persistência default).
+  Future<void> verificarSessao() async {
+    _carregando = true;
+    notifyListeners();
+
+    final currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      debugPrint('[AuthProvider] Sessão encontrada: uid=${currentUser.uid}');
+      _user = currentUser;
+      await _carregarDadosUsuario();
+    } else {
+      debugPrint('[AuthProvider] Nenhuma sessão encontrada');
+    }
+
+    _carregando = false;
+    _inicializado = true;
+    notifyListeners();
+  }
 
   /// Login com e-mail e senha via Firebase Auth.
   Future<bool> login(String email, String senha) async {
@@ -41,9 +63,9 @@ class AuthProvider extends ChangeNotifier {
       _carregando = false;
       notifyListeners();
       return true;
-    } on fb.FirebaseAuthException catch (e) {
-      debugPrint('[AuthProvider] login ERRO: ${e.message}');
-      _erro = e.message ?? 'Erro ao fazer login';
+    }     on fb.FirebaseAuthException catch (e) {
+      debugPrint('[AuthProvider] login ERRO: ${e.code} — ${e.message}');
+      _erro = _mensagemErroLogin(e.code);
       _carregando = false;
       notifyListeners();
       return false;
@@ -148,6 +170,25 @@ class AuthProvider extends ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  String _mensagemErroLogin(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'Nenhuma conta encontrada com este e-mail.';
+      case 'wrong-password':
+        return 'Senha incorreta. Tente novamente.';
+      case 'invalid-credential':
+        return 'E-mail ou senha inválidos. Verifique os dados e tente novamente.';
+      case 'user-disabled':
+        return 'Esta conta foi desativada.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+      case 'network-request-failed':
+        return 'Erro de conexão. Verifique sua internet.';
+      default:
+        return 'E-mail ou senha inválidos. Verifique os dados e tente novamente.';
+    }
   }
 
   /// Logout: limpa Firebase Auth, cache Hive e estado.

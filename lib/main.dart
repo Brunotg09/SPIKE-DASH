@@ -14,7 +14,7 @@ import 'providers/auth_provider.dart';
 import 'providers/usuario_provider.dart';
 import 'providers/partida_provider.dart';
 import 'providers/ranking_provider.dart';
-import 'menu.dart';
+import 'auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,7 +55,7 @@ class SpikeDashApp extends StatelessWidget {
         title: 'SPIKE DASH',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
-        home: const AuthScreen(),
+        home: const AuthGate(),
       ),
     );
   }
@@ -134,21 +134,28 @@ class _AuthScreenState extends State<AuthScreen>
           usuarioProvider.setUsuario(authProvider.usuario!);
         }
         usuarioProvider.carregarDoCache();
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MenuScreen()),
-        );
+        // AuthGate detecta isLoggedIn e navega automaticamente
       } else if (mounted && authProvider.erro != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              authProvider.erro!,
-              style: const TextStyle(
-                  color: Colors.black, fontWeight: FontWeight.bold),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    authProvider.erro!,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                  ),
+                ),
+              ],
             ),
             backgroundColor: AppColors.danger,
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
