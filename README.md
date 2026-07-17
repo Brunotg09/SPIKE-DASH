@@ -81,6 +81,8 @@ flutter run
 O projeto utiliza `flutter_dotenv` para gerenciar credenciais. Crie um arquivo `.env` na raiz;
 ```
 
+Consulte `TECHNOLOGIES.md` para lista completa das 18 variáveis.
+
 ## Tecnologias
 
 | Tecnologia | Versão | Finalidade |

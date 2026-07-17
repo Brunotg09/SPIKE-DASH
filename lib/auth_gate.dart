@@ -28,7 +28,7 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, auth, child) {
-        if (!auth.inicializado || auth.carregando) {
+        if (!auth.inicializado) {
           return const Scaffold(
             backgroundColor: Colors.black,
             body: Center(
@@ -94,6 +94,8 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
   bool _isLogin = true;
   bool _isHoveringAlternator = false;
   bool _isHoveringForgot = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -114,6 +116,9 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _pulseController.repeat(reverse: true);
+
+    _emailController.addListener(() => setState(() {}));
+    _passwordController.addListener(() => setState(() {}));
   }
 
   @override
@@ -268,7 +273,13 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
                 onEnter: (_) => setState(() => _isHoveringAlternator = true),
                 onExit: (_) => setState(() => _isHoveringAlternator = false),
                 child: GestureDetector(
-                  onTap: () => setState(() => _isLogin = !_isLogin),
+                  onTap: () => setState(() {
+                    _isLogin = !_isLogin;
+                    _emailController.clear();
+                    _passwordController.clear();
+                    _nameController.clear();
+                    _confirmPasswordController.clear();
+                  }),
                   child: Text(
                     _isLogin ? 'Registe-se agora' : 'Entrar agora',
                     style: TextStyle(
@@ -290,6 +301,7 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
   Widget _buildLoginForm() {
     return Form(
       key: _loginKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -303,7 +315,8 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
             keyboardType: TextInputType.emailAddress,
             validator: (value) {
               if (value == null || value.isEmpty) return 'Informe seu e-mail';
-              if (!value.contains('@')) return 'E-mail inválido';
+              final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$');
+              if (!emailRegex.hasMatch(value)) return 'E-mail inválido';
               return null;
             },
           ),
@@ -337,9 +350,11 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
             controller: _passwordController,
             hint: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
             icon: Icons.lock_outline,
-            isObscure: true,
+            isObscure: _obscurePassword,
+            onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
             validator: (value) {
               if (value == null || value.isEmpty) return 'Informe sua senha';
+              if (value.length < 6) return 'A senha deve ter no mínimo 6 caracteres';
               return null;
             },
           ),
@@ -351,6 +366,7 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
   Widget _buildRegisterForm() {
     return Form(
       key: _registerKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -377,7 +393,8 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
             keyboardType: TextInputType.emailAddress,
             validator: (value) {
               if (value == null || value.isEmpty) return 'Informe seu e-mail';
-              if (!value.contains('@')) return 'E-mail inválido';
+              final emailRegex = RegExp(r'^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$');
+              if (!emailRegex.hasMatch(value)) return 'E-mail inválido';
               return null;
             },
           ),
@@ -389,7 +406,8 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
             controller: _passwordController,
             hint: 'No mínimo 6 caracteres',
             icon: Icons.lock_outline,
-            isObscure: true,
+            isObscure: _obscurePassword,
+            onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
             validator: (value) {
               if (value == null || value.isEmpty) return 'Defina uma senha';
               if (value.length < 6) return 'A senha deve ter no mínimo 6 caracteres';
@@ -404,7 +422,8 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
             controller: _confirmPasswordController,
             hint: 'Repita a senha criada',
             icon: Icons.lock_clock_outlined,
-            isObscure: true,
+            isObscure: _obscureConfirmPassword,
+            onToggleObscure: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
             validator: (value) {
               if (value != _passwordController.text) return 'As senhas não coincidem';
               return null;
@@ -422,17 +441,29 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
     bool isObscure = false,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    VoidCallback? onToggleObscure,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: isObscure,
       keyboardType: keyboardType,
       validator: validator,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       style: const TextStyle(color: Colors.white, fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
         prefixIcon: Icon(icon, color: AppColors.textMuted, size: 20),
+        suffixIcon: onToggleObscure != null
+            ? IconButton(
+                icon: Icon(
+                  isObscure ? Icons.visibility_off : Icons.visibility,
+                  color: AppColors.textMuted,
+                  size: 20,
+                ),
+                onPressed: onToggleObscure,
+              )
+            : null,
         filled: true,
         fillColor: AppColors.surface,
         enabledBorder: OutlineInputBorder(
@@ -441,12 +472,13 @@ class _AuthFormState extends State<_AuthForm> with SingleTickerProviderStateMixi
         focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+        errorStyle: const TextStyle(color: AppColors.danger, fontSize: 12, fontWeight: FontWeight.w600),
         errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.redAccent)),
+            borderSide: const BorderSide(color: AppColors.danger)),
         focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.redAccent, width: 1.5)),
+            borderSide: const BorderSide(color: AppColors.danger, width: 1.5)),
         contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       ),
     );
