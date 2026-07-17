@@ -1,4 +1,4 @@
-package com.example.spike_dash_app
+package com.spikedash.app
 
 import io.flutter.embedding.android.FlutterActivity
 
