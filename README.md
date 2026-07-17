@@ -59,7 +59,7 @@ lib/
 
 ```bash
 # Clone o repositório
-git clone https://github.com/Brunotg09/spike_dash_app.git
+git clone https://github.com/Brunotg09/SPIKE-DASH.git
 cd spike_dash_app
 
 # Instale dependências
