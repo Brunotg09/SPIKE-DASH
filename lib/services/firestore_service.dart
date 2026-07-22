@@ -22,6 +22,7 @@ class FirestoreService {
     debugPrint('[FirestoreService] salvarUsuario: uid=${usuario.uid}, nickname=${usuario.nickname}');
     await _db.collection('usuarios').doc(usuario.uid).set({
       'uid': usuario.uid,
+      'codigo': usuario.uid.substring(0, 5).toUpperCase(),
       'nickname': usuario.nickname,
       'email': usuario.email,
       'xp': usuario.xp,
@@ -144,6 +145,7 @@ class FirestoreService {
       'uid': usuario.uid,
       'nickname': usuario.nickname,
       'titulo': usuario.titulo,
+      'avatarId': usuario.avatarId,
       'trofeus': usuario.trofeus,
       'vitorias': usuario.vitorias,
       'precisaoMedia': usuario.precisaoMedia,
@@ -215,35 +217,143 @@ class FirestoreService {
 
   // ==================== AMIGOS ====================
 
-  /// Envia pedido de amizade (adiciona UID na lista de amigos de ambos).
+  /// Envia pedido de amizade (adiciona UID em 'pedidosRecebidos' do destinatário).
   Future<bool> enviarPedidoAmizade(String meuUid, String codigoAmigo) async {
     debugPrint('[FirestoreService] enviarPedidoAmizade: $meuUid → $codigoAmigo');
 
-    if (meuUid == codigoAmigo) return false;
+    final uidAmigo = await buscarUidPorCodigo(codigoAmigo);
+    if (uidAmigo == null) return false;
+    if (meuUid == uidAmigo) return false;
 
-    final userDoc = await _db.collection('usuarios').doc(codigoAmigo).get();
+    final userDoc = await _db.collection('usuarios').doc(uidAmigo).get();
     if (!userDoc.exists) return false;
 
     final myDoc = await _db.collection('usuarios').doc(meuUid).get();
     final myFriends = (myDoc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+    if (myFriends.contains(uidAmigo)) return false;
 
-    if (myFriends.contains(codigoAmigo)) return false;
+    final mySent = (myDoc.data()?['pedidosEnviados'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+    if (mySent.contains(uidAmigo)) return false;
 
-    myFriends.add(codigoAmigo);
-    await _db.collection('usuarios').doc(meuUid).set({
-      'amigos': myFriends,
+    final otherReceived = (userDoc.data()?['pedidosRecebidos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+    if (otherReceived.contains(meuUid)) return false;
+
+    otherReceived.add(meuUid);
+    await _db.collection('usuarios').doc(uidAmigo).set({
+      'pedidosRecebidos': otherReceived,
     }, SetOptions(merge: true));
 
-    final otherFriends = (userDoc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
-    if (!otherFriends.contains(meuUid)) {
-      otherFriends.add(meuUid);
-      await _db.collection('usuarios').doc(codigoAmigo).set({
-        'amigos': otherFriends,
-      }, SetOptions(merge: true));
-    }
+    mySent.add(uidAmigo);
+    await _db.collection('usuarios').doc(meuUid).set({
+      'pedidosEnviados': mySent,
+    }, SetOptions(merge: true));
 
     debugPrint('[FirestoreService] enviarPedidoAmizade OK');
     return true;
+  }
+
+  /// Aceita pedido de amizade: adiciona em 'amigos' de ambos e remove de 'pedidosRecebidos'.
+  Future<bool> aceitarPedido(String meuUid, String uidRemetente) async {
+    debugPrint('[FirestoreService] aceitarPedido: $meuUid ← $uidRemetente');
+
+    final myDoc = await _db.collection('usuarios').doc(meuUid).get();
+    final myFriends = (myDoc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+    final myReceived = (myDoc.data()?['pedidosRecebidos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+
+    if (!myReceived.contains(uidRemetente)) return false;
+
+    myFriends.add(uidRemetente);
+    myReceived.remove(uidRemetente);
+    await _db.collection('usuarios').doc(meuUid).set({
+      'amigos': myFriends,
+      'pedidosRecebidos': myReceived,
+    }, SetOptions(merge: true));
+
+    final otherDoc = await _db.collection('usuarios').doc(uidRemetente).get();
+    final otherFriends = (otherDoc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+    final otherSent = (otherDoc.data()?['pedidosEnviados'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+
+    otherFriends.add(meuUid);
+    otherSent.remove(meuUid);
+    await _db.collection('usuarios').doc(uidRemetente).set({
+      'amigos': otherFriends,
+      'pedidosEnviados': otherSent,
+    }, SetOptions(merge: true));
+
+    // Garante que ambos têm documento em 'rankings/' para o stream de amigos funcionar
+    await _garantirRankingDocument(meuUid, myDoc);
+    await _garantirRankingDocument(uidRemetente, otherDoc);
+
+    debugPrint('[FirestoreService] aceitarPedido OK');
+    return true;
+  }
+
+  /// Garante que o usuário tem documento em 'rankings/'.
+  Future<void> _garantirRankingDocument(String uid, DocumentSnapshot? userDoc) async {
+    final rankDoc = await _db.collection('rankings').doc(uid).get();
+    if (!rankDoc.exists) {
+      final data = userDoc?.data() as Map<String, dynamic>?;
+      final nickname = data?['nickname'] ?? 'JOGADOR';
+      final avatarId = data?['avatarId'] ?? 0;
+      await _db.collection('rankings').doc(uid).set({
+        'uid': uid,
+        'nickname': nickname,
+        'titulo': 'ROOKIE',
+        'avatarId': avatarId,
+        'trofeus': 0,
+        'vitorias': 0,
+        'precisaoMedia': 0.0,
+        'periodoSemana': _semanaAtual(),
+      });
+    }
+  }
+
+  /// Recusa pedido de amizade: remove de 'pedidosRecebidos' e 'pedidosEnviados'.
+  Future<void> recusarPedido(String meuUid, String uidRemetente) async {
+    debugPrint('[FirestoreService] recusarPedido: $meuUid ← $uidRemetente');
+
+    final myDoc = await _db.collection('usuarios').doc(meuUid).get();
+    final myReceived = (myDoc.data()?['pedidosRecebidos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+    myReceived.remove(uidRemetente);
+    await _db.collection('usuarios').doc(meuUid).set({
+      'pedidosRecebidos': myReceived,
+    }, SetOptions(merge: true));
+
+    final otherDoc = await _db.collection('usuarios').doc(uidRemetente).get();
+    final otherSent = (otherDoc.data()?['pedidosEnviados'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+    otherSent.remove(meuUid);
+    await _db.collection('usuarios').doc(uidRemetente).set({
+      'pedidosEnviados': otherSent,
+    }, SetOptions(merge: true));
+  }
+
+  /// Retorna lista de UIDs de pedidos recebidos pendentes.
+  Future<List<String>> buscarPedidosRecebidos(String uid) async {
+    final doc = await _db.collection('usuarios').doc(uid).get();
+    return (doc.data()?['pedidosRecebidos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+  }
+
+  /// Retorna lista de UIDs de pedidos enviados pendentes.
+  Future<List<String>> buscarPedidosEnviados(String uid) async {
+    final doc = await _db.collection('usuarios').doc(uid).get();
+    return (doc.data()?['pedidosEnviados'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
+  }
+
+  /// Retorna dados de múltiplos usuários (para exibir pedidos pendentes).
+  Future<List<Map<String, dynamic>>> buscarDadosUsuarios(List<String> uids) async {
+    if (uids.isEmpty) return [];
+    final resultados = <Map<String, dynamic>>[];
+    for (final uid in uids) {
+      final doc = await _db.collection('usuarios').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        resultados.add({
+          'uid': uid,
+          'nickname': doc.data()!['nickname'] ?? 'JOGADOR',
+          'titulo': doc.data()!['titulo'] ?? 'ROOKIE',
+        });
+      }
+    }
+    return resultados;
   }
 
   /// Remove um amigo.
@@ -271,6 +381,18 @@ class FirestoreService {
     return (doc.data()?['amigos'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [];
   }
 
+  /// Busca usuário pelo código curto (5 primeiros caracteres do UID).
+  /// Retorna o UID completo do usuário encontrado ou null.
+  Future<String?> buscarUidPorCodigo(String codigo) async {
+    final snapshot = await _db
+        .collection('usuarios')
+        .where('codigo', isEqualTo: codigo.toUpperCase())
+        .limit(1)
+        .get();
+    if (snapshot.docs.isEmpty) return null;
+    return snapshot.docs.first.id;
+  }
+
   /// Stream em tempo real do ranking dos amigos.
   Stream<QuerySnapshot> streamRankingAmigos(List<String> uidsAmigos, {int limit = 100}) {
     if (uidsAmigos.isEmpty) {
@@ -279,8 +401,36 @@ class FirestoreService {
     return _db
         .collection('rankings')
         .where('uid', whereIn: uidsAmigos)
-        .orderBy('trofeus', descending: true)
-        .limit(limit)
         .snapshots();
+  }
+
+  /// Migração: adiciona campos faltantes em documentos existentes.
+  Future<int> migrarCodigos() async {
+    final snapshot = await _db.collection('usuarios').get();
+    int atualizados = 0;
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final updates = <String, dynamic>{};
+      if (data['codigo'] == null || (data['codigo'] as String).isEmpty) {
+        updates['codigo'] = doc.id.substring(0, 5).toUpperCase();
+      }
+      if (updates.isNotEmpty) {
+        await _db.collection('usuarios').doc(doc.id).update(updates);
+        atualizados++;
+      }
+    }
+
+    // Migra rankings: adiciona avatarId se não existe
+    final rankSnapshot = await _db.collection('rankings').get();
+    for (final doc in rankSnapshot.docs) {
+      final data = doc.data();
+      if (data['avatarId'] == null) {
+        final userDoc = await _db.collection('usuarios').doc(doc.id).get();
+        final avatarId = (userDoc.data()?['avatarId'] ?? 0) as int;
+        await _db.collection('rankings').doc(doc.id).update({'avatarId': avatarId});
+      }
+    }
+
+    return atualizados;
   }
 }

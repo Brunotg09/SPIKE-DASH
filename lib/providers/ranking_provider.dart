@@ -12,6 +12,9 @@ class RankingProvider extends ChangeNotifier {
   Stream<QuerySnapshot>? _streamAmigos;
   int _activeFilter = 0;
   List<String> _uidsAmigos = [];
+  List<String> _pedidosRecebidos = [];
+  List<String> _pedidosEnviados = [];
+  List<Map<String, dynamic>> _dadosPedidosRecebidos = [];
 
   Stream<QuerySnapshot>? get stream {
     if (_activeFilter == 2) return _streamAmigos;
@@ -21,6 +24,10 @@ class RankingProvider extends ChangeNotifier {
 
   int get activeFilter => _activeFilter;
   List<String> get uidsAmigos => _uidsAmigos;
+  List<String> get pedidosRecebidos => _pedidosRecebidos;
+  List<String> get pedidosEnviados => _pedidosEnviados;
+  List<Map<String, dynamic>> get dadosPedidosRecebidos => _dadosPedidosRecebidos;
+  int get totalPedidosPendentes => _pedidosRecebidos.length;
 
   /// Inicia o stream de dados do ranking global.
   void iniciarStreamRanking() {
@@ -32,19 +39,44 @@ class RankingProvider extends ChangeNotifier {
   /// Carrega a lista de amigos e inicia o stream de amigos.
   Future<void> carregarAmigos(String uid) async {
     _uidsAmigos = await _firestore.buscarAmigos(uid);
-    if (_uidsAmigos.isNotEmpty) {
-      _streamAmigos = _firestore.streamRankingAmigos(_uidsAmigos);
+    _streamAmigos = _firestore.streamRankingAmigos(_uidsAmigos);
+    notifyListeners();
+  }
+
+  /// Carrega pedidos pendentes (recebidos e enviados).
+  Future<void> carregarPedidos(String uid) async {
+    _pedidosRecebidos = await _firestore.buscarPedidosRecebidos(uid);
+    _pedidosEnviados = await _firestore.buscarPedidosEnviados(uid);
+    if (_pedidosRecebidos.isNotEmpty) {
+      _dadosPedidosRecebidos = await _firestore.buscarDadosUsuarios(_pedidosRecebidos);
+    } else {
+      _dadosPedidosRecebidos = [];
     }
     notifyListeners();
+  }
+
+  /// Aceita pedido de amizade.
+  Future<bool> aceitarPedido(String meuUid, String uidRemetente) async {
+    final success = await _firestore.aceitarPedido(meuUid, uidRemetente);
+    if (success) {
+      await carregarPedidos(meuUid);
+      await carregarAmigos(meuUid);
+      refreshStream();
+    }
+    return success;
+  }
+
+  /// Recusa pedido de amizade.
+  Future<void> recusarPedido(String meuUid, String uidRemetente) async {
+    await _firestore.recusarPedido(meuUid, uidRemetente);
+    await carregarPedidos(meuUid);
   }
 
   /// Força refresh do stream (recarrega dados do Firestore).
   void refreshStream() {
     _streamGlobal = _firestore.streamRankingGlobal();
     _streamSemanal = _firestore.streamRankingSemanal();
-    if (_uidsAmigos.isNotEmpty) {
-      _streamAmigos = _firestore.streamRankingAmigos(_uidsAmigos);
-    }
+    _streamAmigos = _firestore.streamRankingAmigos(_uidsAmigos);
     notifyListeners();
   }
 

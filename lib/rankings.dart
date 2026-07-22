@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 
 import 'config/theme.dart';
+import 'config/avatars.dart';
 import 'providers/usuario_provider.dart';
 import 'providers/ranking_provider.dart';
 import 'services/firestore_service.dart';
@@ -28,6 +29,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
       final usuario = context.read<UsuarioProvider>().usuario;
       if (usuario != null) {
         provider.carregarAmigos(usuario.uid);
+        provider.carregarPedidos(usuario.uid);
       }
     });
   }
@@ -59,15 +61,18 @@ class _RankingsScreenState extends State<RankingsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
-              'Insira o código (UID) do jogador:',
+              'Insira o código do jogador (5 caracteres):',
               style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
-              style: const TextStyle(color: Colors.white),
+              style: const TextStyle(color: Colors.white, fontSize: 16, letterSpacing: 2),
+              textAlign: TextAlign.center,
+              maxLength: 5,
+              textCapitalization: TextCapitalization.characters,
               decoration: InputDecoration(
-                hintText: 'Código do amigo',
+                hintText: 'ABCDE',
                 hintStyle: TextStyle(color: AppColors.textMuted.withOpacity(0.5)),
                 filled: true,
                 fillColor: AppColors.surfaceElevated,
@@ -106,7 +111,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      success ? 'Amigo adicionado!' : 'Código inválido ou já é amigo',
+                      success ? 'Pedido enviado! Aguarde aceitação.' : 'Código inválido ou já são amigos',
                       style: const TextStyle(fontSize: 14),
                     ),
                     backgroundColor: success ? Colors.green : Colors.red,
@@ -117,12 +122,12 @@ class _RankingsScreenState extends State<RankingsScreen> {
                   ),
                 );
                 if (success) {
-                  context.read<RankingProvider>().carregarAmigos(usuario.uid);
+                  context.read<RankingProvider>().carregarPedidos(usuario.uid);
                 }
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            child: const Text('Adicionar', style: TextStyle(color: Colors.black)),
+            child: const Text('Enviar Pedido', style: TextStyle(color: Colors.black)),
           ),
         ],
       ),
@@ -169,9 +174,39 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       ),
                     ),
                     if (_activeFilter == 2)
-                      IconButton(
-                        onPressed: _showAdicionarAmigo,
-                        icon: const Icon(Icons.person_add, color: AppColors.primary),
+                      Consumer<RankingProvider>(
+                        builder: (context, rankingProvider, child) {
+                          final temPendentes = rankingProvider.totalPedidosPendentes > 0;
+                          return Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              IconButton(
+                                onPressed: _showAdicionarAmigo,
+                                icon: const Icon(Icons.person_add, color: AppColors.primary),
+                              ),
+                              if (temPendentes)
+                                Positioned(
+                                  right: 4,
+                                  top: 4,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      '${rankingProvider.totalPedidosPendentes}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
                       )
                     else
                       const SizedBox(width: 70),
@@ -219,26 +254,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
   Widget _buildPodio() {
     return Consumer2<RankingProvider, UsuarioProvider>(
       builder: (context, rankingProvider, usuarioProvider, child) {
-        if (rankingProvider.stream == null) {
-          if (_activeFilter == 2 && rankingProvider.uidsAmigos.isEmpty) {
-            return const SizedBox(
-              height: 160,
-              child: Center(
-                child: Text(
-                  'Adicione amigos para ver o ranking!',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                ),
-              ),
-            );
-          }
-          return const SizedBox(
-            height: 160,
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
-          );
-        }
+        final temPedidos = _activeFilter == 2 && rankingProvider.dadosPedidosRecebidos.isNotEmpty;
+
         return StreamBuilder<QuerySnapshot>(
           stream: rankingProvider.stream,
           builder: (context, snapshot) {
@@ -252,6 +269,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
             }
 
             if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              if (temPedidos) {
+                return const SizedBox(height: 20);
+              }
               final isEmptyFriends = _activeFilter == 2;
               return SizedBox(
                 height: 160,
@@ -268,7 +288,15 @@ class _RankingsScreenState extends State<RankingsScreen> {
             }
 
             final docs = snapshot.data!.docs;
-            if (docs.length < 3) {
+            final sortedDocs = List<QueryDocumentSnapshot>.from(docs);
+            sortedDocs.sort((a, b) {
+              final aData = a.data() as Map<String, dynamic>;
+              final bData = b.data() as Map<String, dynamic>;
+              final aTrofeus = (aData['trofeus'] ?? 0) as int;
+              final bTrofeus = (bData['trofeus'] ?? 0) as int;
+              return bTrofeus.compareTo(aTrofeus);
+            });
+            if (sortedDocs.length < 3) {
               return SizedBox(
                 height: 160,
                 child: Center(
@@ -287,18 +315,18 @@ class _RankingsScreenState extends State<RankingsScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildPodiumPosition(
-                  name: docs[1]['nickname'] ?? '???',
-                  score: '${docs[1]['trofeus'] ?? 0} t',
-                  avatarColor: AppColors.textMuted,
+                  name: sortedDocs[1]['nickname'] ?? '???',
+                  score: '${sortedDocs[1]['trofeus'] ?? 0} t',
+                  avatarId: (sortedDocs[1]['avatarId'] ?? 0) as int,
                   podiumHeight: 50,
                   podiumLabel: 'II',
                   badgeNumber: '2',
                 ),
                 const SizedBox(width: 12),
                 _buildPodiumPosition(
-                  name: docs[0]['nickname'] ?? '???',
-                  score: '${docs[0]['trofeus'] ?? 0} t',
-                  avatarColor: AppColors.accent,
+                  name: sortedDocs[0]['nickname'] ?? '???',
+                  score: '${sortedDocs[0]['trofeus'] ?? 0} t',
+                  avatarId: (sortedDocs[0]['avatarId'] ?? 0) as int,
                   podiumHeight: 75,
                   podiumLabel: 'I',
                   badgeNumber: '1',
@@ -306,9 +334,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
                 ),
                 const SizedBox(width: 12),
                 _buildPodiumPosition(
-                  name: docs[2]['nickname'] ?? '???',
-                  score: '${docs[2]['trofeus'] ?? 0} t',
-                  avatarColor: AppColors.warning,
+                  name: sortedDocs[2]['nickname'] ?? '???',
+                  score: '${sortedDocs[2]['trofeus'] ?? 0} t',
+                  avatarId: (sortedDocs[2]['avatarId'] ?? 0) as int,
                   podiumHeight: 40,
                   podiumLabel: 'III',
                   badgeNumber: '3',
@@ -324,30 +352,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
   Widget _buildRankingList() {
     return Consumer2<RankingProvider, UsuarioProvider>(
       builder: (context, rankingProvider, usuarioProvider, child) {
-        if (rankingProvider.stream == null) {
-          if (_activeFilter == 2 && rankingProvider.uidsAmigos.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.people_outline,
-                      color: AppColors.textMuted.withOpacity(0.3), size: 48),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Nenhum amigo adicionado.\nToque em + para adicionar!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: AppColors.textMuted.withOpacity(0.5),
-                        fontSize: 13),
-                  ),
-                ],
-              ),
-            );
-          }
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
-        }
+        final temPedidos = _activeFilter == 2 && rankingProvider.dadosPedidosRecebidos.isNotEmpty;
+
         return StreamBuilder<QuerySnapshot>(
           stream: rankingProvider.stream,
           builder: (context, snapshot) {
@@ -357,7 +363,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
               );
             }
 
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            final temAmigos = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+
+            if (!temPedidos && !temAmigos) {
               final isEmptyFriends = _activeFilter == 2;
               return Center(
                 child: Column(
@@ -381,27 +389,171 @@ class _RankingsScreenState extends State<RankingsScreen> {
               );
             }
 
-            final docs = snapshot.data!.docs;
+            final docs = snapshot.hasData ? snapshot.data!.docs : [];
             final myUid = usuarioProvider.usuario?.uid;
 
-            return ListView.builder(
+            return ListView(
               physics: const BouncingScrollPhysics(),
-              itemCount: docs.length,
-              itemBuilder: (context, index) {
-                final data = docs[index].data() as Map<String, dynamic>;
-                final isMe = docs[index].id == myUid;
-                final pos = '#${index + 1}';
-                final name = data['nickname'] ?? '???';
-                final score = '${data['trofeus'] ?? 0} t';
-                final tag = data['titulo'] ?? 'ROOKIE';
-
-                return _buildListRow(
-                    pos, name, score, tag, isMe);
-              },
+              children: [
+                if (temPedidos) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.person_add, color: AppColors.primary, size: 16),
+                            const SizedBox(width: 8),
+                            Text(
+                              'PEDIDOS PENDENTES (${rankingProvider.dadosPedidosRecebidos.length})',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...rankingProvider.dadosPedidosRecebidos.map((pedido) {
+                          return _buildPedidoItem(
+                            context,
+                            rankingProvider,
+                            usuarioProvider.usuario?.uid ?? '',
+                            pedido['uid'] ?? '',
+                            pedido['nickname'] ?? 'JOGADOR',
+                            pedido['titulo'] ?? 'ROOKIE',
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ],
+                if (temAmigos)
+                  ...() {
+                    final sortedDocs = List<QueryDocumentSnapshot>.from(docs);
+                    sortedDocs.sort((a, b) {
+                      final aData = a.data() as Map<String, dynamic>;
+                      final bData = b.data() as Map<String, dynamic>;
+                      final aTrofeus = (aData['trofeus'] ?? 0) as int;
+                      final bTrofeus = (bData['trofeus'] ?? 0) as int;
+                      return bTrofeus.compareTo(aTrofeus);
+                    });
+                    return sortedDocs.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final isMe = doc.id == myUid;
+                      final pos = '#${sortedDocs.indexOf(doc) + 1}';
+                      final name = data['nickname'] ?? '???';
+                      final score = '${data['trofeus'] ?? 0} t';
+                      final tag = data['titulo'] ?? 'ROOKIE';
+                      final avatarId = (data['avatarId'] ?? 0) as int;
+                      return _buildListRow(pos, name, score, tag, isMe, avatarId);
+                    });
+                  }(),
+              ],
             );
           },
         );
       },
+    );
+  }
+
+  Widget _buildPedidoItem(
+    BuildContext context,
+    RankingProvider rankingProvider,
+    String meuUid,
+    String uidRemetente,
+    String nickname,
+    String titulo,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 14,
+            backgroundColor: AppColors.border,
+            child: Icon(Icons.person, size: 14, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nickname,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    titulo,
+                    style: TextStyle(
+                      color: AppColors.secondary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: () async {
+                  await rankingProvider.aceitarPedido(meuUid, uidRemetente);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.check, color: Colors.green, size: 16),
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () async {
+                  await rankingProvider.recusarPedido(meuUid, uidRemetente);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Icon(Icons.close, color: Colors.red, size: 16),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -489,12 +641,12 @@ class _RankingsScreenState extends State<RankingsScreen> {
                         decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                                color: AppColors.primary, width: 1)),
-                        child: const CircleAvatar(
+                                color: AppAvatars.getCor(usuario?.avatarId ?? 0), width: 1)),
+                        child: CircleAvatar(
                             radius: 10,
                             backgroundColor: AppColors.surfaceElevated,
-                            child: Icon(Icons.person,
-                                size: 12, color: AppColors.primary)),
+                            child: Icon(AppAvatars.getIcon(usuario?.avatarId ?? 0),
+                                size: 12, color: AppAvatars.getCor(usuario?.avatarId ?? 0))),
                       ),
                       const SizedBox(width: 8),
                       Text('${usuario?.nickname ?? 'JOGADOR'} (Tu)',
@@ -553,12 +705,14 @@ class _RankingsScreenState extends State<RankingsScreen> {
   Widget _buildPodiumPosition({
     required String name,
     required String score,
-    required Color avatarColor,
+    required int avatarId,
     required double podiumHeight,
     required String podiumLabel,
     required String badgeNumber,
     bool isFirst = false,
   }) {
+    final avatarColor = AppAvatars.getCor(avatarId);
+    final avatarIcon = AppAvatars.getIcon(avatarId);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -578,10 +732,10 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       ]
                     : null,
               ),
-              child: const CircleAvatar(
+              child: CircleAvatar(
                 radius: 22,
                 backgroundColor: AppColors.border,
-                child: Icon(Icons.person, color: Colors.white, size: 22),
+                child: Icon(avatarIcon, color: avatarColor, size: 22),
               ),
             ),
             Container(
@@ -631,8 +785,10 @@ class _RankingsScreenState extends State<RankingsScreen> {
   }
 
   Widget _buildListRow(
-      String pos, String name, String score, String tag, bool isMe) {
+      String pos, String name, String score, String tag, bool isMe, int avatarId) {
     final tagColor = isMe ? AppColors.primary : AppColors.secondary;
+    final avatarColor = AppAvatars.getCor(avatarId);
+    final avatarIcon = AppAvatars.getIcon(avatarId);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -657,11 +813,11 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       fontSize: 13,
                       fontWeight: FontWeight.w900)),
               const SizedBox(width: 14),
-              const CircleAvatar(
+              CircleAvatar(
                   radius: 12,
                   backgroundColor: AppColors.border,
-                  child: Icon(Icons.person,
-                      size: 14, color: Colors.white)),
+                  child: Icon(avatarIcon,
+                      size: 14, color: avatarColor)),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

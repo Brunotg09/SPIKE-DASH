@@ -1,8 +1,10 @@
 // lib/profile_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'config/theme.dart';
+import 'config/avatars.dart';
 import 'providers/auth_provider.dart';
 import 'providers/usuario_provider.dart';
 import 'providers/partida_provider.dart';
@@ -149,14 +151,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                        color: AppColors.secondary, width: 2),
+                                        color: AppAvatars.getCor(usuario?.avatarId ?? 0), width: 2),
                                   ),
                                   child: CircleAvatar(
                                     radius: 32,
                                     backgroundColor: AppColors.surface,
                                     child: Icon(
-                                      _avatarIcons[usuario?.avatarId ?? 0],
-                                      color: AppColors.secondary,
+                                      AppAvatars.getIcon(usuario?.avatarId ?? 0),
+                                      color: AppAvatars.getCor(usuario?.avatarId ?? 0),
                                       size: 36,
                                     ),
                                   ),
@@ -187,12 +189,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           GestureDetector(
                             onTap: () {
                               if (usuario?.uid != null) {
+                                final codigo = usuario!.uid.substring(0, 5).toUpperCase();
+                                Clipboard.setData(ClipboardData(text: codigo));
                                 ScaffoldMessenger.of(context).hideCurrentSnackBar();
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: const Text(
-                                      'Código copiado! Compartilhe com amigos.',
-                                      style: TextStyle(fontSize: 14),
+                                    content: Text(
+                                      'Código $codigo copiado! Compartilhe com amigos.',
+                                      style: const TextStyle(fontSize: 14),
                                     ),
                                     backgroundColor: AppColors.primary,
                                     behavior: SnackBarBehavior.floating,
@@ -213,11 +217,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'Código: ${usuario?.uid?.substring(0, 8) ?? '----'}...',
+                                    'Código: ${usuario?.uid.substring(0, 5).toUpperCase() ?? '-----'}',
                                     style: TextStyle(
                                       color: AppColors.textMuted.withOpacity(0.7),
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: 1,
                                     ),
                                   ),
                                   const SizedBox(width: 4),
@@ -515,16 +520,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          _avatarIcons[index],
+                          AppAvatars.getIcon(index),
                           color: isUnlocked
-                              ? AppColors.primary
+                              ? AppAvatars.getCor(index)
                               : AppColors.textMuted.withOpacity(0.3),
                           size: 22,
                         ),
                         const SizedBox(height: 2),
                         Text(
                           isUnlocked
-                              ? _avatarLabels[index]
+                              ? AppAvatars.nomes[index]
                               : 'Nv.$nivelRequerido',
                           style: TextStyle(
                             color: isUnlocked

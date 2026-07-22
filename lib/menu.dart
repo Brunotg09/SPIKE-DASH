@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'config/theme.dart';
+import 'config/avatars.dart';
 import 'providers/usuario_provider.dart';
 import 'providers/partida_provider.dart';
+import 'services/firestore_service.dart';
 import 'perfect_timing.dart';
 import 'profile.dart';
 import 'rankings.dart';
@@ -30,6 +32,8 @@ class _MenuScreenState extends State<MenuScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<UsuarioProvider>().recarregarDoCache();
       context.read<PartidaProvider>().carregarHistorico();
+      // Migração: adiciona campo 'codigo' em usuários existentes
+      FirestoreService().migrarCodigos();
     });
   }
 
@@ -136,13 +140,16 @@ class _MenuScreenState extends State<MenuScreen> {
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.primary, width: 2),
+                border: Border.all(color: AppAvatars.getCor(usuario?.avatarId ?? 0), width: 2),
               ),
-              child: const CircleAvatar(
+              child: CircleAvatar(
                 radius: 20,
                 backgroundColor: AppColors.surface,
-                child: Icon(Icons.sentiment_satisfied_alt,
-                    color: AppColors.primary, size: 22),
+                child: Icon(
+                  AppAvatars.getIcon(usuario?.avatarId ?? 0),
+                  color: AppAvatars.getCor(usuario?.avatarId ?? 0),
+                  size: 22,
+                ),
               ),
             ),
             const SizedBox(width: 10),
