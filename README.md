@@ -15,7 +15,7 @@ Aplicativo Flutter de competição e treino de reflexos com múltiplos modos de 
 - **Sistema de Progressão** — Níveis de ROOKIE a DIVINO com XP e troféus
 - **7 Avatares Desbloqueáveis** — Conquistas e personalização
 
-## Arquitetura
+## Arquitetura MVVM
 
 Service Layer com 4 camadas:
 
